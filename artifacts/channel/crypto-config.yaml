@@ -1,10 +1,9 @@
-
 OrdererOrgs:
   # ---------------------------------------------------------------------------
   # Orderer
   # ---------------------------------------------------------------------------
   - Name: Orderer
-    Domain: example.com
+    Domain: pesuhospital.com
     EnableNodeOUs: true
 
     # ---------------------------------------------------------------------------
@@ -31,8 +30,8 @@ PeerOrgs:
   # ---------------------------------------------------------------------------
   # Org1
   # ---------------------------------------------------------------------------
-  - Name: Org1
-    Domain: org1.example.com
+  - Name: PESUHospitalBLR
+    Domain: blr.pesuhospital.com
     EnableNodeOUs: true
 
     Template:
@@ -45,8 +44,8 @@ PeerOrgs:
     Users:
       Count: 1
 
-  - Name: Org2
-    Domain: org2.example.com
+  - Name: PESUHospitalKPM
+    Domain: kpm.pesuhospital.com
     EnableNodeOUs: true
 
     Template:

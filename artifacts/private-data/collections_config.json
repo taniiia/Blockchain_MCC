@@ -1,23 +1,26 @@
 [
      {
-          "name": "collectionCars",
-          "policy": "OR('Org1MSP.member', 'Org2MSP.member')",
+          "name": "PrivateMedicalRecords",
+          "policy": "OR('PESUHospitalBLRMSP.member', 'PESUHospitalKPMMSP.member')",
           "requiredPeerCount": 0,
           "maxPeerCount": 3,
           "blockToLive": 1000000,
           "memberOnlyRead": true,
-          "memberOnlyWrite": true
+          "memberOnlyWrite": true,
+          "endorsementPolicy": {
+               "signaturePolicy": "OR('PESUHospitalBLRMSP.member', 'PESUHospitalKPMMSP.member')"
+          }
      },
      {
-          "name": "collectionCarPrivateDetails",
-          "policy": "OR('Org1MSP.member')",
+          "name": "PrivateBillingRecords",
+          "policy": "OR('PESUHospitalBLRMSP.member', 'PESUHospitalKPMMSP.member')",
           "requiredPeerCount": 0,
           "maxPeerCount": 3,
-          "blockToLive": 3,
+          "blockToLive": 1000000,
           "memberOnlyRead": true,
           "memberOnlyWrite": true,
           "endorsementPolicy": {
-               "signaturePolicy": "OR('Org1MSP.member')"
+               "signaturePolicy": "OR('PESUHospitalBLRMSP.member', 'PESUHospitalKPMMSP.member')"
           }
      }
 ]

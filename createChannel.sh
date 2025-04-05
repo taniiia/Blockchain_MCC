@@ -2,7 +2,7 @@ export CORE_PEER_TLS_ENABLED=true
 export ORDERER_CA=${PWD}/artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer.pesuhospital.com/msp/tlscacerts/tlsca.pesuhospital.com-cert.pem
 export PEER0_PESUHOSPITALBLR_CA=${PWD}/artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/peers/peer0.blr.pesuhospital.com/tls/ca.crt
 export PEER0_PESUHOSPITALKPM_CA=${PWD}/artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/peers/peer0.kpm.pesuhospital.com/tls/ca.crt
-export FABRIC_CFG_PATH=${PWD}/artifacts/channel/config/
+export FABRIC_CFG_PATH=${PWD}/artifacts/channel/config/core.yaml
 
 export CHANNEL_NAME=communication-channel
 

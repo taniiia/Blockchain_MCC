@@ -3,7 +3,6 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/taniiia/medical_chaincode/chaincode/models"
@@ -11,15 +10,16 @@ import (
 
 // User represents a user in the system.
 type User struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Role         string    `json:"role"`
-	Organization string    `json:"organization"`
-	PublicKey    string    `json:"publicKey"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Role         string `json:"role"`
+	Organization string `json:"organization"`
+	PublicKey    string `json:"publicKey"`
+	// CreatedAt and UpdatedAt are expected to be provided by the client.
 }
 
 // RegisterUser registers a new user with their public key.
+// Note: It does NOT set CreatedAt/UpdatedAt. The client must include these if needed.
 func RegisterUser(ctx contractapi.TransactionContextInterface, userID, name, role, organization, publicKey string) error {
 	userKey := fmt.Sprintf("user:%s", userID)
 	existingUser, err := ctx.GetStub().GetState(userKey)
@@ -36,7 +36,6 @@ func RegisterUser(ctx contractapi.TransactionContextInterface, userID, name, rol
 		Role:         role,
 		Organization: organization,
 		PublicKey:    publicKey,
-		CreatedAt:    time.Now(),
 	}
 	userJSON, err := json.Marshal(user)
 	if err != nil {
@@ -45,9 +44,32 @@ func RegisterUser(ctx contractapi.TransactionContextInterface, userID, name, rol
 	return ctx.GetStub().PutState(userKey, userJSON)
 }
 
+// DeleteUser deletes a user from the ledger.
+// Only a receptionist can delete users.
+func DeleteUser(ctx contractapi.TransactionContextInterface, callerID, userID string) error {
+	// Check that the caller is a receptionist.
+	caller, err := GetUser(ctx, callerID)
+	if err != nil {
+		return err
+	}
+	if caller.Role != "receptionist" {
+		return fmt.Errorf("only a receptionist can delete users")
+	}
+
+	userKey := fmt.Sprintf("user:%s", userID)
+	existingUser, err := ctx.GetStub().GetState(userKey)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %v", err)
+	}
+	if existingUser == nil {
+		return fmt.Errorf("user %s does not exist", userID)
+	}
+
+	return ctx.GetStub().DelState(userKey)
+}
+
 // InitiateAuthentication starts the mutual authentication process using MCC.
 func InitiateAuthentication(ctx contractapi.TransactionContextInterface, user1ID, user2ID, channelID string) (*AuthSession, error) {
-	// Verify both users exist.
 	if _, err := GetUser(ctx, user1ID); err != nil {
 		return nil, fmt.Errorf("failed to get user1: %v", err)
 	}
@@ -56,11 +78,12 @@ func InitiateAuthentication(ctx contractapi.TransactionContextInterface, user1ID
 	}
 	sessionID := models.GenerateSessionID(user1ID, user2ID, channelID)
 	session := AuthSession{
-		// Now using the session model from models/session.go
+		// Using the session model from models/session.go
 		Session: models.Session{
 			ID:              sessionID,
 			IsAuthenticated: false,
-			ExpiresAt:       time.Now().Add(24 * time.Hour),
+			ExpiresAt:       // Expires in 24 hours:
+				models.Session{}.ExpiresAt.Add(24 * 60 * 60 * 1e9), // or set externally
 		},
 	}
 	sessionJSON, err := json.Marshal(session)
@@ -72,7 +95,7 @@ func InitiateAuthentication(ctx contractapi.TransactionContextInterface, user1ID
 	}
 	return &session, nil
 }
- 
+
 // CompleteAuthentication completes the authentication by updating the session.
 func CompleteAuthentication(ctx contractapi.TransactionContextInterface, sessionID, sharedSecret string) error {
 	sessionJSON, err := ctx.GetStub().GetState(sessionID)
@@ -86,7 +109,6 @@ func CompleteAuthentication(ctx contractapi.TransactionContextInterface, session
 	if err := json.Unmarshal(sessionJSON, &session); err != nil {
 		return fmt.Errorf("failed to unmarshal session: %v", err)
 	}
-	// In a real implementation, the sharedSecret would further secure the session.
 	session.IsAuthenticated = true
 	updatedSessionJSON, err := json.Marshal(session)
 	if err != nil {

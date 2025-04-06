@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 
@@ -30,23 +29,7 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			Role:         "patient",
 			Organization: "blr.pesuhospital.com",
 			PublicKey:    "pubkey-patient1",
-			CreatedAt:    time.Now(),
-		},
-		{
-			ID:           "doctor1",
-			Name:         "Dr. Bob",
-			Role:         "doctor",
-			Organization: "blr.pesuhospital.com",
-			PublicKey:    "pubkey-doctor1",
-			CreatedAt:    time.Now(),
-		},
-		{
-			ID:           "pharmacist1",
-			Name:         "Charlie Pharmacist",
-			Role:         "pharmacist",
-			Organization: "kpm.pesuhospital.com",
-			PublicKey:    "pubkey-pharmacist1",
-			CreatedAt:    time.Now(),
+			// CreatedAt is expected to be provided by the client (backend)
 		},
 		{
 			ID:           "receptionist1",
@@ -54,7 +37,6 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			Role:         "receptionist",
 			Organization: "blr.pesuhospital.com",
 			PublicKey:    "pubkey-receptionist1",
-			CreatedAt:    time.Now(),
 		},
 		{
 			ID:           "receptionist2",
@@ -62,7 +44,6 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			Role:         "receptionist",
 			Organization: "kpm.pesuhospital.com",
 			PublicKey:    "pubkey-receptionist2",
-			CreatedAt:    time.Now(),
 		},
 		{
 			ID:           "insurance1",
@@ -70,7 +51,6 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			Role:         "insurance-agent",
 			Organization: "kpm.pesuhospital.com",
 			PublicKey:    "pubkey-insurance1",
-			CreatedAt:    time.Now(),
 		},
 	}
 
@@ -94,12 +74,11 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return fmt.Errorf("failed to get client identity: %v", err)
 	}
 
-	// Here you could implement additional generic role-based checks.
-	// For each function we will also do role-checks inside the handler methods.
-
 	switch fn {
 	case "registerUser":
 		return auth.RegisterUser(ctx, args[0], args[1], args[2], args[3], args[4])
+	case "deleteUser":
+		return auth.DeleteUser(ctx, clientID, args[0])
 	case "initiateAuthentication":
 		// args: user1ID, user2ID, channelID
 		_, err := auth.InitiateAuthentication(ctx, args[0], args[1], args[2])
@@ -111,10 +90,22 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		// Only doctor should be allowed.
 		handler := handlers.NewPatientHandler(ctx)
 		return handler.CreateMedicalRecord(clientID, args[0], args[1], args[2])
-	case "createPrescription":
-		// Only doctor should be allowed.
+	case "queryMedicalRecordsByPatient":
 		handler := handlers.NewPatientHandler(ctx)
-		// args[0] is patientID, args[1] is a JSON string representing []string, args[2] is notes.
+		records, err := handler.QueryMedicalRecordsByPatient(clientID, args[0])
+		if err != nil {
+			return err
+		}
+		recordsJSON, err := json.Marshal(records)
+		if err != nil {
+			return err
+		}
+		return ctx.GetStub().SetEvent("QueryMedicalRecordsByPatient", recordsJSON)
+	case "deleteMedicalRecord":
+		handler := handlers.NewPatientHandler(ctx)
+		return handler.DeleteMedicalRecord(clientID, args[0])
+	case "createPrescription":
+		handler := handlers.NewPatientHandler(ctx)
 		var meds []string
 		if err := json.Unmarshal([]byte(args[1]), &meds); err != nil {
 			return fmt.Errorf("failed to unmarshal medications: %v", err)
@@ -128,7 +119,6 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return handler.CheckOut(clientID, args[0])
 	case "registerPatient":
 		handler := handlers.NewReceptionistHandler(ctx)
-		// args: patient JSON string
 		var patient models.Patient
 		if err := json.Unmarshal([]byte(args[0]), &patient); err != nil {
 			return fmt.Errorf("failed to unmarshal patient data: %v", err)
@@ -136,7 +126,6 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return handler.RegisterPatient(clientID, patient)
 	case "createBillingRecord":
 		handler := handlers.NewReceptionistHandler(ctx)
-		// args: billingID and a JSON string for the record.
 		var record map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &record); err != nil {
 			return fmt.Errorf("failed to unmarshal billing record: %v", err)
@@ -144,11 +133,9 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return handler.CreateBillingRecord(clientID, args[0], record)
 	case "updateBillingStatus":
 		handler := handlers.NewReceptionistHandler(ctx)
-		// args: billingID, status
 		return handler.UpdateBillingStatus(clientID, args[0], args[1])
 	case "getPatientBillingRecords":
 		handler := handlers.NewReceptionistHandler(ctx)
-		// args: patientID
 		records, err := handler.GetPatientBillingRecords(clientID, args[0])
 		if err != nil {
 			return err
@@ -160,11 +147,9 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return ctx.GetStub().SetEvent("GetPatientBillingRecords", recordsJSON)
 	case "verifyPrescription":
 		handler := handlers.NewPharmacistHandler(ctx)
-		// args: prescriptionID, patientID
 		return handler.VerifyPrescription(clientID, args[0], args[1])
 	case "getPatientPrescriptions":
 		handler := handlers.NewPharmacistHandler(ctx)
-		// args: patientID
 		prescriptions, err := handler.GetPatientPrescriptions(clientID, args[0])
 		if err != nil {
 			return err
@@ -176,7 +161,6 @@ func (s *SmartContract) Invoke(ctx contractapi.TransactionContextInterface) erro
 		return ctx.GetStub().SetEvent("GetPatientPrescriptions", prescJSON)
 	case "reviewBillingRecord":
 		handler := handlers.NewInsuranceHandler(ctx)
-		// args: billingID and a JSON string for the update.
 		var update map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &update); err != nil {
 			return fmt.Errorf("failed to unmarshal update data: %v", err)

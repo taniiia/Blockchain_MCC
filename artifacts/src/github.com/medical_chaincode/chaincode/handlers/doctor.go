@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/taniiia/medical_chaincode/chaincode/models"
@@ -47,7 +46,7 @@ func (h *DoctorHandler) UpdateMedicalRecord(callerID, recordID, diagnosis, treat
 	record.Diagnosis = diagnosis
 	record.Treatment = treatment
 	record.Notes = notes
-	record.UpdatedAt = time.Now()
+	// UpdatedAt is expected to be set externally if needed.
 	updatedJSON, err := json.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated record: %v", err)
@@ -79,7 +78,7 @@ func (h *DoctorHandler) UpdatePrescription(callerID, prescriptionID string, medi
 	}
 
 	prescription.Medication = medications
-	prescription.UpdatedAt = time.Now()
+	// UpdatedAt is expected to be set externally if needed.
 	updatedJSON, err := json.Marshal(prescription)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated prescription: %v", err)

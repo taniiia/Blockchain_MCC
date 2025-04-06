@@ -20,7 +20,6 @@ func GenerateKeyPair() (*MCCKeyPair, error) {
 	if _, err := rand.Read(privateKey); err != nil {
 		return nil, fmt.Errorf("failed to generate private key: %v", err)
 	}
-	// Ensure the private key is valid.
 	privateKey[0] &= 248
 	privateKey[31] &= 127
 	privateKey[31] |= 64

@@ -48,7 +48,7 @@ services:
 
   orderer.pesuhospital.com:
     container_name: orderer.pesuhospital.com
-    image: hyperledger/fabric-orderer:2.1
+    image: hyperledger/fabric-orderer:2.5
     dns_search: .
     environment:
       - ORDERER_GENERAL_LOGLEVEL=info
@@ -83,7 +83,7 @@ services:
 
   orderer2.pesuhospital.com:
     container_name: orderer2.pesuhospital.com
-    image: hyperledger/fabric-orderer:2.1
+    image: hyperledger/fabric-orderer:2.5
     dns_search: .
     environment:
       - ORDERER_GENERAL_LOGLEVEL=info
@@ -118,7 +118,7 @@ services:
 
   orderer3.pesuhospital.com:
     container_name: orderer3.pesuhospital.com
-    image: hyperledger/fabric-orderer:2.1
+    image: hyperledger/fabric-orderer:2.5
     dns_search: .
     environment:
       - ORDERER_GENERAL_LOGLEVEL=info

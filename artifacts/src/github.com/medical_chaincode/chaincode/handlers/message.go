@@ -20,7 +20,6 @@ type Message struct {
 
 // SendMessage stores a message on the ledger for the communication channel.
 func SendMessage(ctx contractapi.TransactionContextInterface, args []string) error {
-	// Expected args: fromId, toId, content.
 	if len(args) < 3 {
 		return fmt.Errorf("incorrect number of arguments; expecting 3")
 	}
@@ -30,7 +29,7 @@ func SendMessage(ctx contractapi.TransactionContextInterface, args []string) err
 		ToID:      args[1],
 		Content:   args[2],
 		Channel:   "communication-channel",
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now(), // Optionally, this could be set externally.
 	}
 	msgJSON, err := json.Marshal(message)
 	if err != nil {

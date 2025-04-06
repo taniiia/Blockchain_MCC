@@ -1,2 +1,7 @@
 Installed chaincodes on peer:
-Package ID: fabcar_1:a91ad0bb1fe08760d65da33d249614f3b482d41d39cce0a981f7a014077af836, Label: fabcar_1
+Package ID: medical_1:a6eeb989543876dcd9f50337ca5f9b5dcb71053df176422e9574b48e72009734, Label: medical_1
+Package ID: medical_103:ddcb5cd152357e8a1c84d91696e68bcfa91bf4fec76c8ad3961facb809ebab2e, Label: medical_103
+Package ID: medical_2:8b6a3baf7d30fbfcc8109db74e54d70d1ffcf35c055798626897665abc0a7dbc, Label: medical_2
+Package ID: medical_1:d87fef9f3a926671a5a9c2016f84b3f14d6e3c062ba955d7555b3ca3e2c01f82, Label: medical_1
+Package ID: medical_1:6ebf64d71a6a37380fd15eb6198080ffbb3576edfd1fbb570229361b9b2a3876, Label: medical_1
+Package ID: medical_2:426a9ae762aa8423a866ebdccceabb6636e08d708bcb974b55f6e47b07b09b9d, Label: medical_2

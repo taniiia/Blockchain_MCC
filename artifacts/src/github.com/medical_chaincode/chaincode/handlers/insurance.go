@@ -36,7 +36,6 @@ func (h *InsuranceHandler) ReviewBillingRecord(callerID, billingID string, updat
 	if err := json.Unmarshal(billingJSON, &record); err != nil {
 		return fmt.Errorf("failed to unmarshal billing record: %v", err)
 	}
-	// Merge the update into the record.
 	for k, v := range update {
 		record[k] = v
 	}

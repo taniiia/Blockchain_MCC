@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -350,7 +349,6 @@ func TestCreateMedicalRecord(t *testing.T) {
 		Role:         "doctor",
 		Organization: "blr.pesuhospital.com",
 		PublicKey:    "pubkey-doctor1",
-		CreatedAt:    time.Now(),
 	}
 	setUserState(t, stub, doctor)
 
@@ -388,7 +386,6 @@ func TestCheckInAndCheckOut(t *testing.T) {
 		Role:         "receptionist",
 		Organization: "blr.pesuhospital.com",
 		PublicKey:    "pubkey-receptionist1",
-		CreatedAt:    time.Now(),
 	}
 	setUserState(t, stub, receptionist)
 
@@ -410,7 +407,6 @@ func TestUpdateMedicalRecord(t *testing.T) {
 		Role:         "doctor",
 		Organization: "blr.pesuhospital.com",
 		PublicKey:    "pubkey-doctor1",
-		CreatedAt:    time.Now(),
 	}
 	setUserState(t, stub, doctor)
 
@@ -473,7 +469,6 @@ func TestBillingFunctions(t *testing.T) {
 		Role:         "receptionist",
 		Organization: "blr.pesuhospital.com",
 		PublicKey:    "pubkey-receptionist1",
-		CreatedAt:    time.Now(),
 	}
 	setUserState(t, stub, receptionist)
 
@@ -522,7 +517,6 @@ func TestInsuranceFunctions(t *testing.T) {
 		Role:         "insurance-agent",
 		Organization: "kpm.pesuhospital.com",
 		PublicKey:    "pubkey-insurance1",
-		CreatedAt:    time.Now(),
 	}
 	setUserState(t, stub, insuranceAgent)
 

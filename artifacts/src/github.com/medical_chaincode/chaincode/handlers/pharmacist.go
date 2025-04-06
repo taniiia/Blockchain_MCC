@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/taniiia/medical_chaincode/chaincode/models"
@@ -43,7 +42,8 @@ func (h *PharmacistHandler) VerifyPrescription(callerID, prescriptionID, patient
 		return fmt.Errorf("failed to unmarshal prescription: %v", err)
 	}
 	prescription.Status = "Dispensed"
-	prescription.UpdatedAt = time.Now()
+	// UpdatedAt is expected to be set externally if needed.
+	//prescription.UpdatedAt = time.Now() // If needed, but can be removed in favor of backend timestamp.
 	updatedJSON, err := json.Marshal(prescription)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated prescription: %v", err)

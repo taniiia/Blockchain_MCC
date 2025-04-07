@@ -6,7 +6,7 @@ export FABRIC_CFG_PATH=${PWD}/artifacts/channel/config
 
 export PRIVATE_DATA_CONFIG=${PWD}/artifacts/private-data/collections_config.json
 
-export CHANNEL_NAME=billing-channel
+export CHANNEL_NAME=registration-channel
 
 setGlobalsForOrderer(){
     export CORE_PEER_LOCALMSPID="OrdererMSP"
@@ -52,7 +52,7 @@ presetup() {
 
 # presetup
 
-CHANNEL_NAME="billing-channel"
+CHANNEL_NAME="registration-channel"
 CC_RUNTIME_LANGUAGE="golang"
 VERSION="2"
 CC_SRC_PATH="./artifacts/src/github.com/medical_chaincode/chaincode"
@@ -66,24 +66,24 @@ packageChaincode() {
         --label ${CC_NAME}_${VERSION}
     echo "===================== Chaincode is packaged on peer0.blr ===================== "
 }
-## packageChaincode
+# packageChaincode
 
 installChaincode() {
     setGlobalsForPeer0BLR
     peer lifecycle chaincode install ${CC_NAME}.tar.gz
     echo "===================== Chaincode is installed on peer0.blr ===================== "
 
-    setGlobalsForPeer1BLR
-    peer lifecycle chaincode install ${CC_NAME}.tar.gz
-    echo "===================== Chaincode is installed on peer1.blr ===================== "
+    # setGlobalsForPeer1BLR
+    # peer lifecycle chaincode install ${CC_NAME}.tar.gz
+    # echo "===================== Chaincode is installed on peer1.blr ===================== "
 
     setGlobalsForPeer0KPM
     peer lifecycle chaincode install ${CC_NAME}.tar.gz
     echo "===================== Chaincode is installed on peer0.kpm ===================== "
 
-    setGlobalsForPeer1KPM
-    peer lifecycle chaincode install ${CC_NAME}.tar.gz
-    echo "===================== Chaincode is installed on peer1.kpm ===================== "
+    # setGlobalsForPeer1KPM
+    # peer lifecycle chaincode install ${CC_NAME}.tar.gz
+    # echo "===================== Chaincode is installed on peer1.kpm ===================== "
 }
 # installChaincode
 
@@ -302,16 +302,26 @@ chaincodeInvokeInit() {
 chaincodeInvoke() {
     setGlobalsForPeer0BLR
 
-    peer chaincode invoke -o localhost:7050 \
+     peer chaincode invoke -o localhost:7050 \
   --ordererTLSHostnameOverride orderer.pesuhospital.com \
   --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA \
   -C $CHANNEL_NAME -n ${CC_NAME} \
   --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_PESUHOSPITALBLR_CA \
   --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_PESUHOSPITALKPM_CA \
   -c '{"function": "InitLedger", "Args": []}'
+
+    #Invoke creating a private medical record.
+    # Expected Args: patientID, doctorID, diagnosis, treatment, notes.
+#     peer chaincode invoke -o localhost:7050 \
+#   --ordererTLSHostnameOverride orderer.pesuhospital.com \
+#   --tls --cafile $ORDERER_CA \
+#   -C $CHANNEL_NAME -n ${CC_NAME} \
+#   --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_PESUHOSPITALBLR_CA \
+#   --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_PESUHOSPITALKPM_CA \
+#   -c '{"function": "SmartContract:createMedicalRecord", "Args": ["patient1", "Flu", "Rest and hydration"]}'
 }
 
- chaincodeInvoke
+# chaincodeInvoke
 
 # chaincodeQuery() {
 #     setGlobalsForPeer0Org2

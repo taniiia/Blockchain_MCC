@@ -4,7 +4,7 @@ export PEER0_PESUHOSPITALBLR_CA=${PWD}/artifacts/channel/crypto-config/peerOrgan
 export PEER0_PESUHOSPITALKPM_CA=${PWD}/artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/peers/peer0.kpm.pesuhospital.com/tls/ca.crt
 export FABRIC_CFG_PATH=${PWD}/artifacts/channel/config
 
-export CHANNEL_NAME=communication-channel
+export CHANNEL_NAME=registration-channel
 
 setGlobalsForOrderer(){
     export CORE_PEER_LOCALMSPID="OrdererMSP"
@@ -77,10 +77,10 @@ joinChannel(){
 
 updateAnchorPeers(){
     setGlobalsForPeer0BLR
-    peer channel update -o localhost:7050 --ordererTLSHostnameOverride orderer.pesuhospital.com -c $CHANNEL_NAME -f ./artifacts/channel/${CORE_PEER_LOCALMSPID}anchors_communication.tx --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
+    peer channel update -o localhost:7050 --ordererTLSHostnameOverride orderer.pesuhospital.com -c $CHANNEL_NAME -f ./artifacts/channel/${CORE_PEER_LOCALMSPID}anchors_registration.tx --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
     
     setGlobalsForPeer0KPM
-    peer channel update -o localhost:7050 --ordererTLSHostnameOverride orderer.pesuhospital.com -c $CHANNEL_NAME -f ./artifacts/channel/${CORE_PEER_LOCALMSPID}anchors_communication.tx --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
+    peer channel update -o localhost:7050 --ordererTLSHostnameOverride orderer.pesuhospital.com -c $CHANNEL_NAME -f ./artifacts/channel/${CORE_PEER_LOCALMSPID}anchors_registration.tx --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA
     
 }
 

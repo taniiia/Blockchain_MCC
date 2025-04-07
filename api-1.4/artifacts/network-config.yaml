@@ -1,155 +1,220 @@
+# yaml-language-server: $schema= https://json.schemastore.org/none.json
 name: "Basic"
 x-type: "hlfv1"
 description: "Basic network"
 version: "1.0"
 channels:
-  mychannel:
+  registration-channel:
     orderers:
-      - orderer.example.com
-
+      - orderer.pesuhospital.com
+      - orderer2.pesuhospital.com
+      - orderer3.pesuhospital.com
     peers:
-      peer0.org1.example.com:
+      peer0.blr.pesuhospital.com:
         endorsingPeer: true
         chaincodeQuery: true
         ledgerQuery: true
         eventSource: true
-
-      peer1.org1.example.com:
+      peer1.blr.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.kpm.pesuhospital.com:
         endorsingPeer: true
         chaincodeQuery: true
         ledgerQuery: true
         eventSource: true
-
-      peer0.org2.example.com:
-        endorsingPeer: true
+      peer1.kpm.pesuhospital.com:
+        endorsingPeer: false
         chaincodeQuery: true
         ledgerQuery: true
         eventSource: true
-
-      peer1.org2.example.com:
-        endorsingPeer: true
-        chaincodeQuery: true
-        ledgerQuery: true
-        eventSource: true
-
     chaincodes:
-      - mycc:v0
+      - medical:v2
+
+  billing-channel:
+    orderers:
+      - orderer.pesuhospital.com
+      - orderer2.pesuhospital.com
+      - orderer3.pesuhospital.com
+    peers:
+      peer0.blr.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.blr.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.kpm.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.kpm.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+    chaincodes:
+      - medical:v1
+
+  communication-channel:
+    orderers:
+      - orderer.pesuhospital.com
+      - orderer2.pesuhospital.com
+      - orderer3.pesuhospital.com
+    peers:
+      peer0.blr.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.blr.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.kpm.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.kpm.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+    chaincodes:
+      - medical:v1
+
+  patient-medication-channel:
+    orderers:
+      - orderer.pesuhospital.com
+      - orderer2.pesuhospital.com
+      - orderer3.pesuhospital.com
+    peers:
+      peer0.blr.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.blr.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.kpm.pesuhospital.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.kpm.pesuhospital.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+    chaincodes:
+      - medical:v1
 
 organizations:
-  Org1:
-    mspid: Org1MSP
-
+  PESUHospitalBLR:
+    mspid: PESUHospitalBLRMSP
     peers:
-      - peer0.org1.example.com
-      - peer1.org1.example.com
-
+      - peer0.blr.pesuhospital.com
+      - peer1.blr.pesuhospital.com
     certificateAuthorities:
-      - ca.org1.example.com
-
+      - ca.blr.pesuhospital.com
     adminPrivateKey:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/priv_sk
+      path: ../artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/users/Admin@blr.pesuhospital.com/msp/keystore/priv_sk
     signedCert:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/Admin@org1.example.com-cert.pem
+      path: ../artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/users/Admin@blr.pesuhospital.com/msp/signcerts/Admin@blr.pesuhospital.com-cert.pem
 
-  Org2:
-    mspid: Org2MSP
-
+  PESUHospitalKPM:
+    mspid: PESUHospitalKPMMSP
     peers:
-      - peer0.org2.example.com
-      - peer1.org2.example.com
-
+      - peer0.kpm.pesuhospital.com
+      - peer1.kpm.pesuhospital.com
     certificateAuthorities:
-      - ca.org2.example.com
-
+      - ca.kpm.pesuhospital.com
     adminPrivateKey:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/keystore/priv_sk
+      path: ../artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/users/Admin@kpm.pesuhospital.com/msp/keystore/priv_sk
     signedCert:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/signcerts/Admin@org2.example.com-cert.pem
+      path: ../artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/users/Admin@kpm.pesuhospital.com/msp/signcerts/Admin@kpm.pesuhospital.com-cert.pem
 
 orderers:
-  orderer.example.com:
+  orderer.pesuhospital.com:
     url: grpcs://localhost:7050
     grpcOptions:
-      ssl-target-name-override: orderer.example.com
+      ssl-target-name-override: orderer.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer.pesuhospital.com/tls/ca.crt
 
-  orderer2.example.com:
+  orderer2.pesuhospital.com:
     url: grpcs://localhost:8050
     grpcOptions:
-      ssl-target-name-override: orderer2.example.com
+      ssl-target-name-override: orderer2.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/ca.crt
 
-  orderer3.example.com:
+  orderer3.pesuhospital.com:
     url: grpcs://localhost:9050
     grpcOptions:
-      ssl-target-name-override: orderer3.example.com
+      ssl-target-name-override: orderer3.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer3.pesuhospital.com/tls/ca.crt
 
-#
-# List of peers to send various requests to, including endorsement, query
-# and event listener registration.
-#
 peers:
-  peer0.org1.example.com:
+  peer0.blr.pesuhospital.com:
     url: grpcs://localhost:7051
-
     grpcOptions:
-      ssl-target-name-override: peer0.org1.example.com
+      ssl-target-name-override: peer0.blr.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/peers/peer0.blr.pesuhospital.com/tls/ca.crt
 
-  peer1.org1.example.com:
+  peer1.blr.pesuhospital.com:
     url: grpcs://localhost:8051
-
     grpcOptions:
-      ssl-target-name-override: peer1.org1.example.com
+      ssl-target-name-override: peer1.blr.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/peers/peer1.blr.pesuhospital.com/tls/ca.crt
 
-  peer0.org2.example.com:
+  peer0.kpm.pesuhospital.com:
     url: grpcs://localhost:9051
-
     grpcOptions:
-      ssl-target-name-override: peer0.org2.example.com
+      ssl-target-name-override: peer0.kpm.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+      path: ../artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/peers/peer0.kpm.pesuhospital.com/tls/ca.crt
 
-  peer1.org2.example.com:
+  peer1.kpm.pesuhospital.com:
     url: grpcs://localhost:10051
-
     grpcOptions:
-      ssl-target-name-override: peer1.org2.example.com
+      ssl-target-name-override: peer1.kpm.pesuhospital.com
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/ca.crt
-#
-# Fabric-CA is a special kind of Certificate Authority provided by Hyperledger Fabric which allows
-# certificate management to be done via REST APIs. Application may choose to use a standard
-# Certificate Authority instead of Fabric-CA, in which case this section would not be specified.
-#
+      path: ../artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/peers/peer1.kpm.pesuhospital.com/tls/ca.crt
+
 certificateAuthorities:
-  ca.org1.example.com:
+  ca.blr.pesuhospital.com:
     url: https://localhost:7054
     httpOptions:
       verify: false
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
-
+      path: ../artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/ca/ca.blr.pesuhospital.com-cert.pem
     registrar:
       - enrollId: admin
         enrollSecret: adminpw
-    caName: ca.org1.example.com
+    caName: ca.blr.pesuhospital.com
 
-  ca.org2.example.com:
+  ca.kpm.pesuhospital.com:
     url: https://localhost:8054
     httpOptions:
       verify: false
     tlsCACerts:
-      path: ../artifacts/channel/crypto-config/peerOrganizations/org2.example.com/ca/ca.org2.example.com-cert.pem
-
+      path: ../artifacts/channel/crypto-config/peerOrganizations/kpm.pesuhospital.com/ca/ca.kpm.pesuhospital.com-cert.pem
     registrar:
       - enrollId: admin
         enrollSecret: adminpw
-    caName: ca.org2.example.com
+    caName: ca.kpm.pesuhospital.com

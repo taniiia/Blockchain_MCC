@@ -32,6 +32,13 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			// CreatedAt is expected to be provided by the client (backend)
 		},
 		{
+			ID:           "doctor1",
+			Name:         "Dr. Bob",
+			Role:         "doctor",
+			Organization: "blr.pesuhospital.com",
+			PublicKey:    "pubkey-doctor1",
+		},
+		{
 			ID:           "receptionist1",
 			Name:         "Diana Reception",
 			Role:         "receptionist",
@@ -44,13 +51,6 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 			Role:         "receptionist",
 			Organization: "kpm.pesuhospital.com",
 			PublicKey:    "pubkey-receptionist2",
-		},
-		{
-			ID:           "insurance1",
-			Name:         "Evan Insurance",
-			Role:         "insurance-agent",
-			Organization: "kpm.pesuhospital.com",
-			PublicKey:    "pubkey-insurance1",
 		},
 	}
 

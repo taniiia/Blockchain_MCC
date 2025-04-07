@@ -1,0 +1,149 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Hyperledger Fabric Connection Profile",
+    "type": "object",
+    "required": ["name", "x-type", "version", "channels", "organizations", "orderers", "peers", "certificateAuthorities"],
+    "properties": {
+      "name": { "type": "string" },
+      "x-type": { "type": "string" },
+      "description": { "type": "string" },
+      "version": { "type": "string" },
+      "channels": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["orderers", "peers", "chaincodes"],
+          "properties": {
+            "orderers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "peers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "endorsingPeer": { "type": "boolean" },
+                  "chaincodeQuery": { "type": "boolean" },
+                  "ledgerQuery": { "type": "boolean" },
+                  "eventSource": { "type": "boolean" }
+                }
+              }
+            },
+            "chaincodes": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      },
+      "organizations": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["mspid", "peers", "certificateAuthorities", "adminPrivateKey", "signedCert"],
+          "properties": {
+            "mspid": { "type": "string" },
+            "peers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "certificateAuthorities": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "adminPrivateKey": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              }
+            },
+            "signedCert": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "orderers": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["url", "grpcOptions", "tlsCACerts"],
+          "properties": {
+            "url": { "type": "string" },
+            "grpcOptions": {
+              "type": "object",
+              "properties": {
+                "ssl-target-name-override": { "type": "string" }
+              }
+            },
+            "tlsCACerts": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "peers": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["url", "grpcOptions", "tlsCACerts"],
+          "properties": {
+            "url": { "type": "string" },
+            "grpcOptions": {
+              "type": "object",
+              "properties": {
+                "ssl-target-name-override": { "type": "string" }
+              }
+            },
+            "tlsCACerts": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "certificateAuthorities": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["url", "httpOptions", "tlsCACerts", "registrar", "caName"],
+          "properties": {
+            "url": { "type": "string" },
+            "httpOptions": {
+              "type": "object",
+              "properties": {
+                "verify": { "type": "boolean" }
+              }
+            },
+            "tlsCACerts": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" }
+              }
+            },
+            "registrar": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "enrollId": { "type": "string" },
+                  "enrollSecret": { "type": "string" }
+                }
+              }
+            },
+            "caName": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+  

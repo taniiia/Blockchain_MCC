@@ -110,7 +110,7 @@
                             },
                             {
                                     "host": "orderer3.example.com",
-                                    "port": 9050
+                                    "port": 9150
                             }
                     ]
             }

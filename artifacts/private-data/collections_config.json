@@ -12,7 +12,7 @@
           }
      },
      {
-          "name": "PrivateBillingRecords",
+          "name": "PrivatePrescriptions",
           "policy": "OR('PESUHospitalBLRMSP.member', 'PESUHospitalKPMMSP.member')",
           "requiredPeerCount": 0,
           "maxPeerCount": 3,

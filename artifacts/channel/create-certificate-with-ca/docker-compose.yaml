@@ -5,37 +5,37 @@ networks:
 
 services:
 
-  ca_org1:
+  ca_blr:
     image: hyperledger/fabric-ca
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca.org1.example.com
+      - FABRIC_CA_SERVER_CA_NAME=ca.blr.pesuhospital.com
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_PORT=7054
     ports:
       - "7054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./fabric-ca/org1:/etc/hyperledger/fabric-ca-server
-    container_name: ca.org1.example.com
-    hostname: ca.org1.example.com
+      - ./fabric-ca/blr:/etc/hyperledger/fabric-ca-server
+    container_name: ca.blr.pesuhospital.com
+    hostname: ca.blr.pesuhospital.com
     networks:
       - test
 
-  ca_org2:
+  ca_kpm:
     image: hyperledger/fabric-ca
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
-      - FABRIC_CA_SERVER_CA_NAME=ca.org2.example.com
+      - FABRIC_CA_SERVER_CA_NAME=ca.kpm.pesuhospital.com
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_PORT=8054
     ports:
       - "8054:8054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ./fabric-ca/org2:/etc/hyperledger/fabric-ca-server
-    container_name: ca.org2.example.com
-    hostname: ca.org2.example.com
+      - ./fabric-ca/kpm:/etc/hyperledger/fabric-ca-server
+    container_name: ca.kpm.pesuhospital.com
+    hostname: ca.kpm.pesuhospital.com
     networks:
       - test
 

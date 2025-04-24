@@ -1,68 +1,61 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const helper = require('./helper.js');
+const logger = helper.getLogger('Create-Channel');
+
 /**
- * Copyright 2017 IBM All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the 'License');
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an 'AS IS' BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Create a channel using the specified channel config
+ * @param {string} channelName - Name of the channel to create
+ * @param {string} channelConfigPath - Path to the channel.tx file
+ * @param {string} username - Admin username (e.g., 'admin')
+ * @param {string} orgName - Organization name (e.g., 'PESUHospitalBLR')
  */
-var fs = require('fs');
-var path = require('path');
+const createChannel = async (channelName, channelConfigPath, username, orgName) => {
+    logger.debug(`\n====== Creating Channel '${channelName}' ======\n`);
+    try {
+        // Initialize the client for the org
+        const client = await helper.getClientForOrg(orgName, username);
+        logger.debug(`Successfully got the fabric client for the organization "${orgName}"`);
 
-var helper = require('./helper.js');
-var logger = helper.getLogger('Create-Channel');
-//Attempt to send a request to the orderer with the sendTransaction method
-var createChannel = async function(channelName, channelConfigPath, username, orgName) {
-	logger.debug('\n====== Creating Channel \'' + channelName + '\' ======\n');
-	try {
-		// first setup the client for this org
-		var client = await helper.getClientForOrg(orgName);
-		logger.debug('Successfully got the fabric client for the organization "%s"', orgName);
+        // Read the channel config tx file
+        const envelopePath = path.resolve(__dirname, channelConfigPath);
+        const envelope = fs.readFileSync(envelopePath);
+        const channelConfig = client.extractChannelConfig(envelope);
 
-		// read in the envelope for the channel config raw bytes
-		var envelope = fs.readFileSync(path.join(__dirname, channelConfigPath));
-		// extract the channel config bytes from the envelope to be signed
-		var channelConfig = client.extractChannelConfig(envelope);
+        // Sign the config using the admin identity
+        const signature = client.signChannelConfig(channelConfig);
 
-		//Acting as a client in the given organization provided with "orgName" param
-		// sign the channel config bytes as "endorsement", this is required by
-		// the orderer's channel creation policy
-		// this will use the admin identity assigned to the client when the connection profile was loaded
-		let signature = client.signChannelConfig(channelConfig);
+        const txId = client.newTransactionID(true); // admin transaction
+        const request = {
+            config: channelConfig,
+            signatures: [signature],
+            name: channelName,
+            orderer: client.getOrderer(), // OPTIONAL: if using custom orderer
+            txId
+        };
 
-		let request = {
-			config: channelConfig,
-			signatures: [signature],
-			name: channelName,
-			txId: client.newTransactionID(true) // get an admin based transactionID
-		};
+        // Send the createChannel request
+        const response = await client.createChannel(request);
+        logger.debug('Response :: %j', response);
 
-		// send to orderer
-		var response = await client.createChannel(request)
-		logger.debug(' response ::%j', response);
-		if (response && response.status === 'SUCCESS') {
-			logger.debug('Successfully created the channel.');
-			let response = {
-				success: true,
-				message: 'Channel \'' + channelName + '\' created Successfully'
-			};
-			return response;
-		} else {
-			logger.error('\n!!!!!!!!! Failed to create the channel \'' + channelName +
-				'\' !!!!!!!!!\n\n');
-			throw new Error('Failed to create the channel \'' + channelName + '\'');
-		}
-	} catch (err) {
-		logger.error('Failed to initialize the channel: ' + err.stack ? err.stack :	err);
-		throw new Error('Failed to initialize the channel: ' + err.toString());
-	}
+        if (response && response.status === 'SUCCESS') {
+            logger.info(`Successfully created the channel '${channelName}'`);
+            return {
+                success: true,
+                message: `Channel '${channelName}' created successfully`
+            };
+        } else {
+            logger.error(`Failed to create the channel '${channelName}'`);
+            throw new Error(`Failed to create the channel '${channelName}'`);
+        }
+    } catch (err) {
+        logger.error('Failed to initialize the channel:', err.stack || err);
+        throw new Error(`Failed to initialize the channel: ${err.message}`);
+    }
 };
 
-exports.createChannel = createChannel;
+module.exports = {
+    createChannel
+};

@@ -2,7 +2,12 @@
     "host": "localhost",
     "port": "4000",
     "jwt_expiretime": "36000",
-    "channelName": "mychannel",
+    "channels": [
+    "registration-channel",
+    "billing-channel",
+    "communication-channel",
+    "patient-medication-channel"
+    ],
     "CC_SRC_PATH": "../artifacts",
     "eventWaitTime": "30000",
     "admins": [

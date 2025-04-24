@@ -6,7 +6,7 @@ export FABRIC_CFG_PATH=${PWD}/artifacts/channel/config
 
 export PRIVATE_DATA_CONFIG=${PWD}/artifacts/private-data/collections_config.json
 
-export CHANNEL_NAME=registration-channel
+export CHANNEL_NAME=patient-medication-channel
 
 setGlobalsForOrderer(){
     export CORE_PEER_LOCALMSPID="OrdererMSP"
@@ -50,13 +50,13 @@ presetup() {
     echo Finished vendoring Go dependencies
 }
 
-# presetup
+#presetup
 
-CHANNEL_NAME="registration-channel"
+CHANNEL_NAME="patient-medication-channel"
 CC_RUNTIME_LANGUAGE="golang"
-VERSION="2"
+VERSION="4"
 CC_SRC_PATH="./artifacts/src/github.com/medical_chaincode/chaincode"
-CC_NAME="medical"
+CC_NAME="mychaincode"
 
 packageChaincode() {
     rm -rf ${CC_NAME}.tar.gz
@@ -66,7 +66,7 @@ packageChaincode() {
         --label ${CC_NAME}_${VERSION}
     echo "===================== Chaincode is packaged on peer0.blr ===================== "
 }
-# packageChaincode
+#packageChaincode
 
 installChaincode() {
     setGlobalsForPeer0BLR
@@ -85,7 +85,7 @@ installChaincode() {
     # peer lifecycle chaincode install ${CC_NAME}.tar.gz
     # echo "===================== Chaincode is installed on peer1.kpm ===================== "
 }
-# installChaincode
+#installChaincode
 
 queryInstalled() {
     setGlobalsForPeer0BLR
@@ -95,8 +95,7 @@ queryInstalled() {
     echo PackageID is ${PACKAGE_ID}
     echo "===================== Query installed successful on peer0.blr on channel ===================== "
 }
-
-# queryInstalled
+#queryInstalled
 
 # --collections-config ./artifacts/private-data/collections_config.json \
 #         --signature-policy "OR('PESUHospitalBLRMSP.member','PESUHospitalKPMMSP.member')" \
@@ -116,15 +115,15 @@ approveForMyBLR() {
     echo "===================== chaincode approved from blr ===================== "
 }
 
-# approveForMyBLR
+#approveForMyBLR
 
 getBlock() {
     setGlobalsForPeer0BLR
-    # peer channel fetch 10 -c registration-channel -o localhost:7050 \
+    # peer channel fetch 10 -c patient-medication-channel -o localhost:7050 \
     #     --ordererTLSHostnameOverride orderer.pesuhospital.com --tls \
     #     --cafile $ORDERER_CA
 
-    peer channel getinfo  -c registration-channel -o localhost:7050 \
+    peer channel getinfo  -c patient-medication-channel -o localhost:7050 \
         --ordererTLSHostnameOverride orderer.pesuhospital.com --tls \
         --cafile $ORDERER_CA
 }
@@ -148,7 +147,7 @@ checkCommitReadyness() {
     echo "===================== checking commit readyness from blr ===================== "
 }
 
-# checkCommitReadyness
+#checkCommitReadyness
 
 # --collections-config ./artifacts/private-data/collections_config.json \
 # --signature-policy "OR('PESUHospitalBLRMSP.member','PESUHospitalKPMMSP.member')" \
@@ -165,7 +164,7 @@ approveForMyKPM() {
     echo "===================== chaincode approved from kpm ===================== "
 }
 
-# approveForMyKPM
+#approveForMyKPM
 
 checkCommitReadyness() {
 
@@ -177,7 +176,7 @@ checkCommitReadyness() {
     echo "===================== checking commit readyness from blr ===================== "
 }
 
-# checkCommitReadyness
+#checkCommitReadyness
 
 commitChaincodeDefinition() {
     setGlobalsForPeer0BLR
@@ -191,7 +190,7 @@ commitChaincodeDefinition() {
     echo "Chaincode committed"
 }
 
-# commitChaincodeDefinition
+#commitChaincodeDefinition
 
 queryCommitted() {
     setGlobalsForPeer0BLR
@@ -199,7 +198,7 @@ queryCommitted() {
 
 }
 
-# queryCommitted
+queryCommitted
 
 chaincodeInvokeInit() {
     setGlobalsForPeer0BLR
@@ -214,7 +213,7 @@ chaincodeInvokeInit() {
 
 }
 
-# chaincodeInvokeInit
+#chaincodeInvokeInit
 
 # chaincodeInvoke() {
 #     # setGlobalsForPeer0BLR
@@ -308,7 +307,7 @@ chaincodeInvoke() {
   -C $CHANNEL_NAME -n ${CC_NAME} \
   --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_PESUHOSPITALBLR_CA \
   --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_PESUHOSPITALKPM_CA \
-  -c '{"function": "InitLedger", "Args": []}'
+  -c '{"function": "initLedger", "Args": []}'
 
     #Invoke creating a private medical record.
     # Expected Args: patientID, doctorID, diagnosis, treatment, notes.
@@ -321,7 +320,7 @@ chaincodeInvoke() {
 #   -c '{"function": "SmartContract:createMedicalRecord", "Args": ["patient1", "Flu", "Rest and hydration"]}'
 }
 
-# chaincodeInvoke
+#chaincodeInvoke
 
 # chaincodeQuery() {
 #     setGlobalsForPeer0Org2

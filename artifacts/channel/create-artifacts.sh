@@ -12,21 +12,21 @@
 
 # System channel
 SYS_CHANNEL="sys-channel"
-REG_CHANNEL="registration-channel"
+# REG_CHANNEL="registration-channel"
 PM_CHANNEL="patient-medication-channel"
-BILL_CHANNEL="billing-channel"
-COMM_CHANNEL="communication-channel"
+# BILL_CHANNEL="billing-channel"
+# COMM_CHANNEL="communication-channel"
 
 
 
 # # Generate System Genesis block
-#echo "Generating genesis block for system channel ($SYS_CHANNEL)..."
-#configtxgen -profile OrdererGenesis -configPath . -channelID $SYS_CHANNEL  -outputBlock ./genesis.block
+# echo "Generating genesis block for system channel ($SYS_CHANNEL)..."
+# configtxgen -profile OrdererGenesis -configPath . -channelID $SYS_CHANNEL  -outputBlock ./genesis.block
 
 #Generate channel config for each channel
 # configtxgen -profile RegistrationChannel -configPath . -outputCreateChannelTx ./registration-channel.tx -channelID $REG_CHANNEL
 
-# configtxgen -profile PatientMedicationChannel -configPath . -outputCreateChannelTx ./patient-medication-channel.tx -channelID $PM_CHANNEL
+#configtxgen -profile PatientMedicationChannel -configPath . -outputCreateChannelTx ./patient-medication-channel.tx -channelID $PM_CHANNEL
 
 # configtxgen -profile BillingChannel -configPath . -outputCreateChannelTx ./billing-channel.tx -channelID $BILL_CHANNEL
 
@@ -35,7 +35,7 @@ COMM_CHANNEL="communication-channel"
 # echo "#######    Generating anchor peer update for PESUHospitalBLRMSP  ##########"
 # configtxgen -profile RegistrationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalBLRMSPanchors_registration.tx -channelID $REG_CHANNEL -asOrg PESUHospitalBLRMSP
 
-# configtxgen -profile PatientMedicationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalBLRMSPanchors_patient_medication.tx -channelID $PM_CHANNEL -asOrg PESUHospitalBLRMSP
+#configtxgen -profile PatientMedicationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalBLRMSPanchors_patient_medication.tx -channelID $PM_CHANNEL -asOrg PESUHospitalBLRMSP
 
 # configtxgen -profile BillingChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalBLRMSPanchors_billing.tx -channelID $BILL_CHANNEL -asOrg PESUHospitalBLRMSP
 
@@ -44,7 +44,7 @@ COMM_CHANNEL="communication-channel"
 # echo "#######    Generating anchor peer update for PESUHospitalKPMMSP  ##########"
 # configtxgen -profile RegistrationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalKPMMSPanchors_registration.tx -channelID $REG_CHANNEL -asOrg PESUHospitalKPMMSP
 
-# configtxgen -profile PatientMedicationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalKPMMSPanchors_patient_medication.tx -channelID $PM_CHANNEL -asOrg PESUHospitalKPMMSP
+#configtxgen -profile PatientMedicationChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalKPMMSPanchors_patient_medication.tx -channelID $PM_CHANNEL -asOrg PESUHospitalKPMMSP
 
 # configtxgen -profile BillingChannel -configPath . -outputAnchorPeersUpdate ./PESUHospitalKPMMSPanchors_billing.tx -channelID $BILL_CHANNEL -asOrg PESUHospitalKPMMSP
 

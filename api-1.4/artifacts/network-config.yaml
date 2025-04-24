@@ -3,6 +3,19 @@ name: "Basic"
 x-type: "hlfv1"
 description: "Basic network"
 version: "1.0"
+client:
+  organization: PESUHospitalBLR
+  connection:
+    timeout:
+      peer:
+        endorser: 300
+        eventHub: 300
+        eventReg: 300
+      orderer: 300
+  credentialStore:
+    path: "BasicNetwork-2.0/api-1.4/fabric-client-kv-blr"
+    cryptoStore:
+      path: "BasicNetwork-2.0/api-1.4/crypto/blr"
 channels:
   registration-channel:
     orderers:
@@ -161,7 +174,7 @@ orderers:
       path: ../artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/ca.crt
 
   orderer3.pesuhospital.com:
-    url: grpcs://localhost:9050
+    url: grpcs://localhost:9150
     grpcOptions:
       ssl-target-name-override: orderer3.pesuhospital.com
     tlsCACerts:

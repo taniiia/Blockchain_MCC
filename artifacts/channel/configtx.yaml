@@ -220,7 +220,7 @@ Orderer: &OrdererDefaults
           ClientTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/server.crt
           ServerTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/server.crt
         - Host: orderer3.pesuhospital.com
-          Port: 9050
+          Port: 9150
           ClientTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer3.pesuhospital.com/tls/server.crt
           ServerTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer3.pesuhospital.com/tls/server.crt
 
@@ -228,7 +228,7 @@ Orderer: &OrdererDefaults
     Addresses:
         - orderer.pesuhospital.com:7050
         - orderer2.pesuhospital.com:8050
-        - orderer3.pesuhospital.com:9050
+        - orderer3.pesuhospital.com:9150
 
     # Batch Timeout: The amount of time to wait before creating a batch
     BatchTimeout: 2s
@@ -375,7 +375,7 @@ Profiles:
                   ClientTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/server.crt
                   ServerTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer2.pesuhospital.com/tls/server.crt
                 - Host: orderer3.pesuhospital.com
-                  Port: 9050
+                  Port: 9150
                   ClientTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer3.pesuhospital.com/tls/server.crt
                   ServerTLSCert: crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer3.pesuhospital.com/tls/server.crt
                 # - Host: orderer4.example.com
@@ -389,7 +389,7 @@ Profiles:
             Addresses:
                 - orderer.pesuhospital.com:7050
                 - orderer2.pesuhospital.com:8050
-                - orderer3.pesuhospital.com:9050
+                - orderer3.pesuhospital.com:9150
                 # - orderer4.example.com:10050
                 # - orderer5.example.com:11050
 

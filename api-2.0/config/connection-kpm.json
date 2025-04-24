@@ -1,0 +1,62 @@
+{
+    "name": "first-network-kpm",
+    "version": "1.0.0",
+    "client": {
+        "organization": "PESUHospitalKPM",
+        "connection": {
+            "timeout": {
+                "peer": {
+                    "endorser": "300"
+                }
+            }
+        }
+    },
+    "organizations": {
+        "PESUHospitalKPM": {
+            "mspid": "PESUHospitalKPMMSP",
+            "peers": [
+                "peer0.kpm.pesuhospital.com",
+                "peer1.kpm.pesuhospital.com"
+            ],
+            "certificateAuthorities": [
+                "ca.kpm.pesuhospital.com"
+            ]
+        }
+    },
+    "peers": {
+        "peer0.kpm.pesuhospital.com": {
+            "url": "grpcs://localhost:9051",
+            "tlsCACerts": {
+                "pem": "-----BEGIN CERTIFICATE-----\nMIICFzCCAb2gAwIBAgIUC9YYooupb6RlsY5aZDjxQRZnpqkwCgYIKoZIzj0EAwIw\naDELMAkGA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQK\nEwtIeXBlcmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMt\nY2Etc2VydmVyMB4XDTI1MDQxNTE3MzgwMFoXDTQwMDQxMTE3MzgwMFowaDELMAkG\nA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQKEwtIeXBl\ncmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMtY2Etc2Vy\ndmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGgWAYDJHG9urjpzsmT0ekLBc\nDPzMrSQQbtVdlaX2LWzEBU+3CNy0S/sj9ilWzgAWHC6RYypGzyYnEe59/x5AlqNF\nMEMwDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQEwHQYDVR0OBBYE\nFBzeBIbqFKKOLUxOFAQdv+etOBv2MAoGCCqGSM49BAMCA0gAMEUCIQDp/5QYgEfa\nVqXBYPUr5VhhCI9Zgx5PEE4+hgLWOGqz1AIgLcmS9wf4rpm8Ctmx78/sPlwHRrG2\nar8D94Z5tiFf8C0=\n-----END CERTIFICATE-----\n"
+            },
+            "grpcOptions": {
+                "ssl-target-name-override": "peer0.kpm.pesuhospital.com",
+                "hostnameOverride": "peer0.kpm.pesuhospital.com"
+            }
+        },
+	"peer1.kpm.pesuhospital.com": {
+            "url": "grpcs://localhost:10051",
+            "tlsCACerts": {
+                "pem": "-----BEGIN CERTIFICATE-----\nMIICFzCCAb2gAwIBAgIUC9YYooupb6RlsY5aZDjxQRZnpqkwCgYIKoZIzj0EAwIw\naDELMAkGA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQK\nEwtIeXBlcmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMt\nY2Etc2VydmVyMB4XDTI1MDQxNTE3MzgwMFoXDTQwMDQxMTE3MzgwMFowaDELMAkG\nA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQKEwtIeXBl\ncmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMtY2Etc2Vy\ndmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGgWAYDJHG9urjpzsmT0ekLBc\nDPzMrSQQbtVdlaX2LWzEBU+3CNy0S/sj9ilWzgAWHC6RYypGzyYnEe59/x5AlqNF\nMEMwDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQEwHQYDVR0OBBYE\nFBzeBIbqFKKOLUxOFAQdv+etOBv2MAoGCCqGSM49BAMCA0gAMEUCIQDp/5QYgEfa\nVqXBYPUr5VhhCI9Zgx5PEE4+hgLWOGqz1AIgLcmS9wf4rpm8Ctmx78/sPlwHRrG2\nar8D94Z5tiFf8C0=\n-----END CERTIFICATE-----\n"
+            },
+            "grpcOptions": {
+                "ssl-target-name-override": "peer1.kpm.pesuhospital.com",
+                "hostnameOverride": "peer1.kpm.pesuhospital.com"
+            }
+        }
+
+	
+    },
+    "certificateAuthorities": {
+        "ca.kpm.pesuhospital.com": {
+            "url": "https://localhost:8054",
+            "caName": "ca.kpm.pesuhospital.com",
+            "tlsCACerts": {
+                "pem": "-----BEGIN CERTIFICATE-----\nMIICFzCCAb2gAwIBAgIUC9YYooupb6RlsY5aZDjxQRZnpqkwCgYIKoZIzj0EAwIw\naDELMAkGA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQK\nEwtIeXBlcmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMt\nY2Etc2VydmVyMB4XDTI1MDQxNTE3MzgwMFoXDTQwMDQxMTE3MzgwMFowaDELMAkG\nA1UEBhMCVVMxFzAVBgNVBAgTDk5vcnRoIENhcm9saW5hMRQwEgYDVQQKEwtIeXBl\ncmxlZGdlcjEPMA0GA1UECxMGRmFicmljMRkwFwYDVQQDExBmYWJyaWMtY2Etc2Vy\ndmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGgWAYDJHG9urjpzsmT0ekLBc\nDPzMrSQQbtVdlaX2LWzEBU+3CNy0S/sj9ilWzgAWHC6RYypGzyYnEe59/x5AlqNF\nMEMwDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQEwHQYDVR0OBBYE\nFBzeBIbqFKKOLUxOFAQdv+etOBv2MAoGCCqGSM49BAMCA0gAMEUCIQDp/5QYgEfa\nVqXBYPUr5VhhCI9Zgx5PEE4+hgLWOGqz1AIgLcmS9wf4rpm8Ctmx78/sPlwHRrG2\nar8D94Z5tiFf8C0=\n-----END CERTIFICATE-----\n"
+            },
+            "httpOptions": {
+                "verify": false
+            }
+        }
+    }
+}

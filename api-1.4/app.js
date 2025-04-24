@@ -1,438 +1,688 @@
-/**
- * Copyright 2017 IBM All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the 'License');
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an 'AS IS' BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 'use strict';
-var log4js = require('log4js');
-var logger = log4js.getLogger('SampleWebApp');
-var express = require('express');
-var bodyParser = require('body-parser');
-var http = require('http');
-var util = require('util');
-var app = express();
-var expressJWT = require('express-jwt');
-var jwt = require('jsonwebtoken');
-var bearerToken = require('express-bearer-token');
-var cors = require('cors');
-const prometheus = require('prom-client')
 
-require('./config.js');
-var hfc = require('fabric-client');
+const log4js = require('log4js');
+const logger = log4js.getLogger('MyApp');
+logger.setLevel('DEBUG');
 
-var helper = require('./app/helper.js');
-var createChannel = require('./app/create-channel.js');
-var join = require('./app/join-channel.js');
-var install = require('./app/install-chaincode.js');
-var instantiate = require('./app/instantiate-chaincode.js');
-var invoke = require('./app/invoke-transaction.js');
-var query = require('./app/query.js');
-var host = process.env.HOST || hfc.getConfigSetting('host');
-var port = process.env.PORT || hfc.getConfigSetting('port');
+const express = require('express');
+const bodyParser = require('body-parser');
+const http = require('http');
+const util = require('util');
+const expressJWT = require('express-jwt');
+const jwt = require('jsonwebtoken');
+const bearerToken = require('express-bearer-token');
+const cors = require('cors');
 
+const config = require('./config.js');
+const hfc = require('fabric-client');
 
+const helper = require('./app/helper.js');
+const invoke = require('./app/invokeChaincode.js');
+const mcc = require('./app/mcc.js');  
+
+const app = express();
 app.options('*', cors());
 app.use(cors());
-//support parsing of application/json type post data
 app.use(bodyParser.json());
-//support parsing of application/x-www-form-urlencoded post data
-app.use(bodyParser.urlencoded({
-	extended: false
-}));
-// set secret variable
-app.set('secret', 'thisismysecret');
-app.use(expressJWT({
-	secret: 'thisismysecret'
-}).unless({
-	path: ['/users', '/metrics']
-}));
-app.use(bearerToken());
-app.use(function (req, res, next) {
-	logger.debug(' ------>>>>>> new request for %s', req.originalUrl);
-	if (req.originalUrl.indexOf('/users') >= 0 || req.originalUrl.indexOf('/metrics') >= 0) {
-		return next();
-	}
+app.use(bodyParser.urlencoded({ extended: false }));
 
-	var token = req.token;
-	jwt.verify(token, app.get('secret'), function (err, decoded) {
-		if (err) {
-			res.send({
-				success: false,
-				message: 'Failed to authenticate token. Make sure to include the ' +
-					'token returned from /users call in the authorization header ' +
-					' as a Bearer token'
-			});
-			return;
-		} else {
-			// add the decoded user name and org name to the request object
-			// for the downstream code to use
-			req.username = decoded.username;
-			req.orgname = decoded.orgName;
-			logger.debug(util.format('Decoded from JWT token: username - %s, orgname - %s', decoded.username, decoded.orgName));
-			return next();
-		}
-	});
+app.set('secret', 'thisismysecret');
+app.use(expressJWT({ secret: 'thisismysecret' }).unless({ path: ['/users'] }));
+app.use(bearerToken());
+app.use((req, res, next) => {
+  logger.debug('New request for %s', req.originalUrl);
+  if (req.originalUrl.includes('/users')) {
+    return next();
+  }
+  const token = req.token;
+  jwt.verify(token, app.get('secret'), (err, decoded) => {
+    if (err) {
+      return res.status(403).json({
+        success: false,
+        message: 'Failed to authenticate token. Include token from /users as Bearer.'
+      });
+    } else {
+      req.username = decoded.username;
+      req.orgname = decoded.orgName;
+      logger.debug(util.format('Decoded JWT: username - %s, orgName - %s', decoded.username, decoded.orgName));
+      next();
+    }
+  });
 });
 
-///////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// START SERVER /////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-var server = http.createServer(app).listen(port, function () { });
-logger.info('****************** SERVER STARTED ************************');
-logger.info('***************  http://%s:%s  ******************', host, port);
+// Start the Server
+const host = process.env.HOST || config.host;
+const port = process.env.PORT || config.port;
+const server = http.createServer(app).listen(port, () => {
+  logger.info('SERVER STARTED at http://%s:%s', host, port);
+});
 server.timeout = 240000;
 
+// Helper function for error messages
 function getErrorMessage(field) {
-	var response = {
-		success: false,
-		message: field + ' field is missing or Invalid in the request'
-	};
-	return response;
+  return { success: false, message: `${field} field is missing or invalid in the request` };
 }
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////// REST ENDPOINTS START HERE ///////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-// Register and enroll user
-app.post('/users', async function (req, res) {
-	var username = req.body.username;
-	var orgName = req.body.orgName;
-	logger.debug('End point : /users');
-	logger.debug('User name : ' + username);
-	logger.debug('Org name  : ' + orgName);
-	if (!username) {
-		res.json(getErrorMessage('\'username\''));
-		return;
-	}
-	if (!orgName) {
-		res.json(getErrorMessage('\'orgName\''));
-		return;
-	}
-	var token = jwt.sign({
-		exp: Math.floor(Date.now() / 1000) + parseInt(hfc.getConfigSetting('jwt_expiretime')),
-		username: username,
-		orgName: orgName
-	}, app.get('secret'));
-	let response = await helper.getRegisteredUser(username, orgName, true);
-	logger.debug('-- returned from registering the username %s for organization %s', username, orgName);
-	if (response && typeof response !== 'string') {
-		logger.debug('Successfully registered the username %s for organization %s', username, orgName);
-		response.token = token;
-		res.json(response);
-	} else {
-		logger.debug('Failed to register the username %s for organization %s with::%s', username, orgName, response);
-		res.json({ success: false, message: response });
-	}
+// ----- Registration Channel Endpoints ----- //
 
-});
-// Create Channel
-app.post('/channels', async function (req, res) {
-	logger.info('<<<<<<<<<<<<<<<<< C R E A T E  C H A N N E L >>>>>>>>>>>>>>>>>');
-	logger.debug('End point : /channels');
-	var channelName = req.body.channelName;
-	var channelConfigPath = req.body.channelConfigPath;
-	logger.debug('Channel name : ' + channelName);
-	logger.debug('channelConfigPath : ' + channelConfigPath); //../artifacts/channel/mychannel.tx
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!channelConfigPath) {
-		res.json(getErrorMessage('\'channelConfigPath\''));
-		return;
-	}
+// Register pharmacists / receptionists. Expects: { name, organization, role }
+app.post('/users', async (req, res) => {
+  const { name, organization, role } = req.body;
+  if (!name || !organization || !role) {
+    return res.json(getErrorMessage('name, organization, and role'));
+  }
 
-	let message = await createChannel.createChannel(channelName, channelConfigPath, req.username, req.orgname);
-	res.send(message);
-});
-// Join Channel
-app.post('/channels/:channelName/peers', async function (req, res) {
-	logger.info('<<<<<<<<<<<<<<<<< J O I N  C H A N N E L >>>>>>>>>>>>>>>>>');
-	var channelName = req.params.channelName;
-	var peers = req.body.peers;
-	logger.debug('channelName : ' + channelName);
-	logger.debug('peers : ' + peers);
-	logger.debug('username :' + req.username);
-	logger.debug('orgname:' + req.orgname);
+  const token = jwt.sign({
+    exp: Math.floor(Date.now() / 1000) + parseInt(hfc.getConfigSetting('jwt_expiretime')),
+    username: name,
+    orgName: organization,
+    role
+  }, app.get('secret'));
 
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!peers || peers.length == 0) {
-		res.json(getErrorMessage('\'peers\''));
-		return;
-	}
-
-	let message = await join.joinChannel(channelName, peers, req.username, req.orgname);
-	res.send(message);
-});
-// Install chaincode on target peers
-app.post('/chaincodes', async function (req, res) {
-	logger.debug('==================== INSTALL CHAINCODE ==================');
-	var peers = req.body.peers;
-	var chaincodeName = req.body.chaincodeName;
-	var chaincodePath = req.body.chaincodePath;
-	var chaincodeVersion = req.body.chaincodeVersion;
-	var chaincodeType = req.body.chaincodeType;
-	logger.debug('peers : ' + peers); // target peers list
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('chaincodePath  : ' + chaincodePath);
-	logger.debug('chaincodeVersion  : ' + chaincodeVersion);
-	logger.debug('chaincodeType  : ' + chaincodeType);
-	if (!peers || peers.length == 0) {
-		res.json(getErrorMessage('\'peers\''));
-		return;
-	}
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!chaincodePath) {
-		res.json(getErrorMessage('\'chaincodePath\''));
-		return;
-	}
-	if (!chaincodeVersion) {
-		res.json(getErrorMessage('\'chaincodeVersion\''));
-		return;
-	}
-	if (!chaincodeType) {
-		res.json(getErrorMessage('\'chaincodeType\''));
-		return;
-	}
-	let message = await install.installChaincode(peers, chaincodeName, chaincodePath, chaincodeVersion, chaincodeType, req.username, req.orgname)
-	res.send(message);
-});
-// Instantiate chaincode on target peers
-app.post('/channels/:channelName/chaincodes', async function (req, res) {
-	logger.debug('==================== INSTANTIATE CHAINCODE ==================');
-	var peers = req.body.peers;
-	var chaincodeName = req.body.chaincodeName;
-	var chaincodeVersion = req.body.chaincodeVersion;
-	var channelName = req.params.channelName;
-	var chaincodeType = req.body.chaincodeType;
-	var fcn = req.body.fcn;
-	var args = req.body.args;
-	logger.debug('peers  : ' + peers);
-	logger.debug('channelName  : ' + channelName);
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('chaincodeVersion  : ' + chaincodeVersion);
-	logger.debug('chaincodeType  : ' + chaincodeType);
-	logger.debug('fcn  : ' + fcn);
-	logger.debug('args  : ' + args);
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!chaincodeVersion) {
-		res.json(getErrorMessage('\'chaincodeVersion\''));
-		return;
-	}
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!chaincodeType) {
-		res.json(getErrorMessage('\'chaincodeType\''));
-		return;
-	}
-	if (!args) {
-		res.json(getErrorMessage('\'args\''));
-		return;
-	}
-
-	let message = await instantiate.instantiateChaincode(peers, channelName, chaincodeName, chaincodeVersion, chaincodeType, fcn, args, req.username, req.orgname);
-	res.send(message);
+  const response = await helper.getRegisteredUser(name, organization, role, true);
+  if (response && typeof response !== 'string') {
+    response.token = token;
+    res.json(response);
+  } else {
+    res.json({ success: false, message: response });
+  }
 });
 
 
 
-// Invoke transaction on chaincode on target peers
-app.post('/channels/:channelName/chaincodes/:chaincodeName', async function (req, res) {
-	try {
-		logger.debug('==================== INVOKE ON CHAINCODE ==================');
-		var peers = req.body.peers;
-		var chaincodeName = req.params.chaincodeName;
-		var channelName = req.params.channelName;
-		var fcn = req.body.fcn;
-		var args = req.body.args;
-		logger.debug('channelName  : ' + channelName);
-		logger.debug('chaincodeName : ' + chaincodeName);
-		logger.debug('fcn  : ' + fcn);
-		logger.debug('args  : ' + args);
-		if (!chaincodeName) {
-			res.json(getErrorMessage('\'chaincodeName\''));
-			return;
-		}
-		if (!channelName) {
-			res.json(getErrorMessage('\'channelName\''));
-			return;
-		}
-		if (!fcn) {
-			res.json(getErrorMessage('\'fcn\''));
-			return;
-		}
-		if (!args) {
-			res.json(getErrorMessage('\'args\''));
-			return;
-		}
+// Register patient. Expects: { name, age, organization, gender }
+app.post('/registerPatient', async (req, res) => {
+  const { name, age, organization, gender } = req.body;
+  if (!name || !age || !organization || !gender) {
+    return res.json(getErrorMessage('name, age, organization, gender'));
+  }
 
-		const start = Date.now();
-		let message = await invoke.invokeChaincode(peers, channelName, chaincodeName, fcn, args, req.username, req.orgname);
-		const latency = Date.now() - start;
+  const token = jwt.sign({
+    exp: Math.floor(Date.now() / 1000) + parseInt(hfc.getConfigSetting('jwt_expiretime')),
+    username: name,
+    orgName: organization,
+    role: 'patient',
+    age,
+    gender
+  }, app.get('secret'));
 
+  const response = await helper.getRegisteredPatient(name, organization, 'patient', age, gender, true);
 
-		const response_payload = {
-			result: message,
-			error: null,
-			errorData: null
-		}
-		res.send(response_payload);
+  if (response && typeof response !== 'string') {
+    // Now save to ledger
+    await invoke.invokeChaincode(
+      peers,
+      "registration-channel",
+      "mychaincode",
+      "registerPatient",
+      [name, age.toString(), organization, gender],
+      name,
+      organization
+    );
 
-	} catch (error) {
-		const response_payload = {
-			result: null,
-			error: error.name,
-			errorData: error.message
-		}
-		res.send(response_payload)
-	}
+    response.token = token;
+    res.json(response);
+  } else {
+    res.json({ success: false, message: response });
+  }
 });
 
 
-// Query on chaincode on target peers
-app.get('/channels/:channelName/chaincodes/:chaincodeName', async function (req, res) {
-	logger.debug('==================== QUERY BY CHAINCODE ==================');
-	var channelName = req.params.channelName;
-	var chaincodeName = req.params.chaincodeName;
-	let args = req.query.args;
-	let fcn = req.query.fcn;
-	let peer = req.query.peer;
+// Register doctor. Expects: { name, gender, specialisation, organization }
+app.post('/registerDoctor', async (req, res) => {
+  const { name, gender, specialisation, organization } = req.body;
+  if (!name || !gender || !specialisation || !organization) {
+    return res.json(getErrorMessage('name, gender, specialisation, organization'));
+  }
 
-	logger.debug('channelName : ' + channelName);
-	logger.debug('chaincodeName : ' + chaincodeName);
-	logger.debug('fcn : ' + fcn);
-	logger.debug('args : ' + args);
+  const token = jwt.sign({
+    exp: Math.floor(Date.now() / 1000) + parseInt(hfc.getConfigSetting('jwt_expiretime')),
+    username: name,
+    orgName: organization,
+    role: 'doctor',
+    gender,
+    specialisation
+  }, app.get('secret'));
 
-	if (!chaincodeName) {
-		res.json(getErrorMessage('\'chaincodeName\''));
-		return;
-	}
-	if (!channelName) {
-		res.json(getErrorMessage('\'channelName\''));
-		return;
-	}
-	if (!fcn) {
-		res.json(getErrorMessage('\'fcn\''));
-		return;
-	}
-	if (!args) {
-		res.json(getErrorMessage('\'args\''));
-		return;
-	}
-	args = args.replace(/'/g, '"');
-	args = JSON.parse(args);
-	logger.debug(args);
+  const response = await helper.getRegisteredDoctor(name, organization, 'doctor', gender, specialisation, true);
 
-	let message = await query.queryChaincode(peer, channelName, chaincodeName, args, fcn, req.username, req.orgname);
-	res.send(message);
-});
+  if (response && typeof response !== 'string') {
+    // Store doctor in ledger
+    await invoke.invokeChaincode(
+      peers,
+      "registration-channel",
+      "mychaincode",
+      "registerDoctor",
+      [name, gender, specialisation, organization],
+      name,
+      organization
+    );
 
-//  Query Get Block by BlockNumber
-app.get('/channels/:channelName/blocks/:blockId', async function (req, res) {
-	logger.debug('==================== GET BLOCK BY NUMBER ==================');
-	let blockId = req.params.blockId;
-	let peer = req.query.peer;
-	logger.debug('channelName : ' + req.params.channelName);
-	logger.debug('BlockID : ' + blockId);
-	logger.debug('Peer : ' + peer);
-	if (!blockId) {
-		res.json(getErrorMessage('\'blockId\''));
-		return;
-	}
-
-	let message = await query.getBlockByNumber(peer, req.params.channelName, blockId, req.username, req.orgname);
-	res.send(message);
-});
-
-// Query Get Transaction by Transaction ID
-app.get('/channels/:channelName/transactions/:trxnId', async function (req, res) {
-	logger.debug('================ GET TRANSACTION BY TRANSACTION_ID ======================');
-	logger.debug('channelName : ' + req.params.channelName);
-	let trxnId = req.params.trxnId;
-	let peer = req.query.peer;
-	if (!trxnId) {
-		res.json(getErrorMessage('\'trxnId\''));
-		return;
-	}
-
-	let message = await query.getTransactionByID(peer, req.params.channelName, trxnId, req.username, req.orgname);
-	res.send(message);
-});
-// Query Get Block by Hash
-app.get('/channels/:channelName/blocks', async function (req, res) {
-	logger.debug('================ GET BLOCK BY HASH ======================');
-	logger.debug('channelName : ' + req.params.channelName);
-	let hash = req.query.hash;
-	let peer = req.query.peer;
-	if (!hash) {
-		res.json(getErrorMessage('\'hash\''));
-		return;
-	}
-
-	let message = await query.getBlockByHash(peer, req.params.channelName, hash, req.username, req.orgname);
-	res.send(message);
-});
-//Query for Channel Information
-app.get('/channels/:channelName', async function (req, res) {
-	logger.debug('================ GET CHANNEL INFORMATION ======================');
-	logger.debug('channelName : ' + req.params.channelName);
-	let peer = req.query.peer;
-
-	let message = await query.getChainInfo(peer, req.params.channelName, req.username, req.orgname);
-	res.send(message);
-});
-//Query for Channel instantiated chaincodes
-app.get('/channels/:channelName/chaincodes', async function (req, res) {
-	logger.debug('================ GET INSTANTIATED CHAINCODES ======================');
-	logger.debug('channelName : ' + req.params.channelName);
-	let peer = req.query.peer;
-
-	let message = await query.getInstalledChaincodes(peer, req.params.channelName, 'instantiated', req.username, req.orgname);
-	res.send(message);
-});
-// Query to fetch all Installed/instantiated chaincodes
-app.get('/chaincodes', async function (req, res) {
-	var peer = req.query.peer;
-	var installType = req.query.type;
-	logger.debug('================ GET INSTALLED CHAINCODES ======================');
-
-	let message = await query.getInstalledChaincodes(peer, null, 'installed', req.username, req.orgname)
-	res.send(message);
-});
-// Query to fetch channels
-app.get('/channels', async function (req, res) {
-	logger.debug('================ GET CHANNELS ======================');
-	logger.debug('peer: ' + req.query.peer);
-	var peer = req.query.peer;
-	if (!peer) {
-		res.json(getErrorMessage('\'peer\''));
-		return;
-	}
-
-	let message = await query.getChannels(peer, req.username, req.orgname);
-	res.send(message);
+    response.token = token;
+    res.json(response);
+  } else {
+    res.json({ success: false, message: response });
+  }
 });
 
 
-module.exports = app
+// Patient check-in (Registration channel): Expects: { patientID, doctorID, patientInfo, status }
+app.post('/patientCheckIn', async (req, res) => {
+  const { patientID, doctorID, patientInfo, status, peers } = req.body;
+  if (!patientID || !doctorID || !patientInfo || !status) {
+    return res.json(getErrorMessage('patientID, doctorID, patientInfo, status'));
+  }
+  try {
+    const start = Date.now();
+    const message = await invoke.invokeChaincode(
+      peers,
+      "registration-channel",
+      "mychaincode",
+      "patientCheckIn",
+      [patientID, doctorID, JSON.stringify(patientInfo), status],
+      req.username,
+      req.orgname
+    );
+    res.json({ result: message, latency: Date.now() - start });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+// Check-out (Registration channel): { patientID, doctorID, patientInfo, status }
+app.post('/checkOut', async (req, res) => {
+  const { patientID, doctorID, patientInfo, status, peers } = req.body;
+  if (!patientID || !doctorID || !patientInfo || !status) {
+    return res.json(getErrorMessage('patientID, doctorID, patientInfo, status'));
+  }
+  try {
+    const message = await invoke.invokeChaincode(
+      peers,
+      "registration-channel",
+      "mychaincode",
+      "checkOut",
+      [patientID, doctorID, JSON.stringify(patientInfo), status],
+      req.username,
+      req.orgname
+    );
+    res.json({ result: message });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+// ----- Patient-Medication Channel Endpoints ----- //
+
+// Create Medical Record (doctor only). Expects: { patientID, doctorID, symptoms, diagnosis, notes }
+app.post('/createMedicalRecord', async (req, res) => {
+
+  const { patientID, doctorID, symptoms, diagnosis, notes, peers, doctorPrivateKey, patientPublicKey } = req.body;
+  
+  if (!patientID || !doctorID || !symptoms || !diagnosis || !notes || !doctorPrivateKey || !patientPublicKey) {
+    return res.json(getErrorMessage('patientID, doctorID, symptoms, diagnosis, notes, doctorPrivateKey, and patientPublicKey'));
+  }
+  
+  try {
+    const mcc = require('./app/mcc.js');
+    
+    // Decode the provided keys from Base64 to Uint8Array.
+    const docPrivKey = mcc.decodeKey(doctorPrivateKey);
+    const patPubKey = mcc.decodeKey(patientPublicKey);
+    
+    // Generate a shared secret using doctor's private key and patient's public key.
+    const sharedSecret = mcc.generateSharedSecret(docPrivKey, patPubKey);
+    
+    // Create a record object including a timestamp.
+    const record = {
+      patientID: patientID,
+      doctorID: doctorID,
+      symptoms: symptoms,
+      diagnosis: diagnosis,
+      notes: notes
+    };
+    
+    // Encrypt the record using the shared secret.
+    const encrypted = mcc.encryptData(JSON.stringify(record), sharedSecret);
+    
+    
+    const payload = {
+      ciphertext: encrypted.ciphertext,
+      nonce: encrypted.nonce,
+      senderPublicKey: patientPublicKey  
+    };
+    
+    const message = await invoke.invokeChaincode(
+      peers,
+      "patient-medication-channel",
+      "mychaincode",
+      "createMedicalRecord",
+      [patientID, doctorID, JSON.stringify(payload)],
+      req.username,
+      req.orgname
+    );
+    
+    res.json({ result: message });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+
+// Get Medical Record (secured by MCC). Query parameters: recordID, receiverID, mccAuthToken, peer
+app.get('/getMedicalRecord', async (req, res) => {
+  const { recordID, receiverID, mccAuthToken, peer, patientPrivateKey, doctorPublicKey } = req.query;
+
+  if (!recordID || !receiverID || !mccAuthToken || !patientPrivateKey || !doctorPublicKey) {
+    return res.json({
+      error: 'Missing recordID, receiverID, mccAuthToken, patientPrivateKey, or doctorPublicKey'
+    });
+  }
+
+  try {
+    const { signature, publicKey: requesterPublicKey } = JSON.parse(mccAuthToken);
+    const mcc = require('./app/mcc.js');
+    const challenge = `access_medical_record:${recordID}`;
+
+    const isValid = mcc.verifySignature(
+      mcc.decodeKey(requesterPublicKey),
+      challenge,
+      signature
+    );
+    if (!isValid) throw new Error('Invalid MCC signature');
+
+    const response = await invoke.invokeChaincode(
+      [peer],
+      'patient-medication-channel',
+      'mychaincode',
+      'getMedicalRecord',
+      [recordID, receiverID, mccAuthToken],
+      req.username,
+      req.orgname
+    );
+
+    const record = JSON.parse(response);
+
+    // 🔐 Generate shared secret using patient's private key and doctor's public key
+    const sharedSecret = mcc.generateSharedSecret(
+      mcc.decodeKey(patientPrivateKey),   // Patient's private key
+      mcc.decodeKey(doctorPublicKey)      // Doctor's public key
+    );
+
+    // 🔓 Decrypt the encrypted data using shared secret
+    const plaintext = mcc.decryptData(
+      record.encrypted.ciphertext,
+      record.encrypted.nonce,
+      sharedSecret
+    );
+
+    res.json({ result: JSON.parse(plaintext) });
+
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+
+
+// app.post('/updateMedicalRecord', async (req, res) => {
+//   const { recordID, newData, peer, receiverID, mccAuthToken } = req.body;
+//   if (!recordID || !newData || !receiverID || !mccAuthToken) {
+//     return res.json({ error: 'Missing required fields' });
+//   }
+
+//   try {
+//     const { signature, publicKey } = JSON.parse(mccAuthToken);
+//     const mcc = require('./app/mcc.js');
+//     const challenge = `update_medical_record:${recordID}`;
+
+//     const isValid = mcc.verifySignature(mcc.decodeKey(publicKey), challenge, signature);
+//     if (!isValid) throw new Error('Invalid MCC signature');
+
+//     const sharedSecret = mcc.generateSharedSecret(
+//       req.userPrivateKey,
+//       mcc.decodeKey(publicKey)
+//     );
+//     const encrypted = mcc.encryptData(JSON.stringify(newData), sharedSecret);
+
+//     const response = await invoke.invokeChaincode(
+//       [peer],
+//       'patient-medication-channel',
+//       'mychaincode',
+//       'updateMedicalRecord',
+//       [recordID, receiverID, mccAuthToken, JSON.stringify(encrypted)],
+//       req.username,
+//       req.orgname
+//     );
+//     res.json({ result: response });
+//   } catch (err) {
+//     res.json({ error: err.message });
+//   }
+// });
+
+
+// Create Prescription (doctor only). Expects: { patientID, doctorID, medications (JSON string), billAmount }
+app.post('/createPrescription', async (req, res) => {
+  const { patientID, doctorID, medications, billAmount, peers, doctorPrivateKey, pharmacistPublicKey } = req.body;
+
+  if (!patientID || !doctorID || !medications || !billAmount || !doctorPrivateKey || !pharmacistPublicKey) {
+    return res.json(getErrorMessage('patientID, doctorID, medications, billAmount, doctorPrivateKey, and pharmacistPublicKey'));
+  }
+
+  try {
+    const mcc = require('./app/mcc.js');
+
+    // Construct the prescription data object
+    const prescriptionData = {
+      medications,
+      billAmount
+    };
+
+    // Generate shared secret using doctor's private key and pharmacist's public key
+    const sharedSecret = mcc.generateSharedSecret(
+      mcc.decodeKey(doctorPrivateKey),
+      mcc.decodeKey(pharmacistPublicKey)
+    );
+
+    // Encrypt the prescription data
+    const encrypted = mcc.encryptData(JSON.stringify(prescriptionData), sharedSecret);
+
+    // Send encrypted data to the blockchain
+    const message = await invoke.invokeChaincode(
+      peers,
+      "patient-medication-channel",
+      "mychaincode",
+      "createPrescription",
+      [patientID, doctorID, JSON.stringify(encrypted)],
+      req.username,
+      req.orgname
+    );
+
+    res.json({ result: message });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+
+// Get Prescription (secured with MCC). Query: { prescriptionID, receiverID, mccAuthToken, peer }
+app.get('/getPrescription', async (req, res) => {
+  const { prescriptionID, receiverID, mccAuthToken, peer, pharmacistPrivateKey, doctorPublicKey } = req.query;
+
+  if (!prescriptionID || !receiverID || !mccAuthToken || !pharmacistPrivateKey || !doctorPublicKey) {
+    return res.json({ error: 'Missing required params: prescriptionID, receiverID, mccAuthToken, pharmacistPrivateKey, or doctorPublicKey' });
+  }
+
+  try {
+    const mcc = require('./app/mcc.js');
+    const { signature, publicKey } = JSON.parse(mccAuthToken);
+    const challenge = `access_prescription:${prescriptionID}`;
+
+    const isValid = mcc.verifySignature(mcc.decodeKey(publicKey), challenge, signature);
+    if (!isValid) throw new Error('Invalid MCC signature');
+
+    // Fetch the encrypted prescription from the chaincode
+    const response = await invoke.invokeChaincode(
+      [peer],
+      'patient-medication-channel',
+      'mychaincode',
+      'getPrescription',
+      [prescriptionID, receiverID, mccAuthToken],
+      req.username,
+      req.orgname
+    );
+
+    const encrypted = JSON.parse(response);
+
+    // Generate shared secret using pharmacist's private key and doctor's public key
+    const sharedSecret = mcc.generateSharedSecret(
+      mcc.decodeKey(pharmacistPrivateKey),
+      mcc.decodeKey(doctorPublicKey)
+    );
+
+    // Decrypt the data
+    const plaintext = mcc.decryptData(
+      encrypted.ciphertext,
+      encrypted.nonce,
+      sharedSecret
+    );
+
+    res.json({ result: JSON.parse(plaintext) });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+
+// Update Prescription (doctor only with MCC). Expects: { prescriptionID, doctorID, field, newValue, mccAuthToken }
+// app.post('/updatePrescription', async (req, res) => {
+//   const { prescriptionID, newData, receiverID, mccAuthToken, peer } = req.body;
+//   if (!prescriptionID || !newData || !receiverID || !mccAuthToken) {
+//     return res.json({ error: 'Missing fields' });
+//   }
+
+//   try {
+//     const { signature, publicKey } = JSON.parse(mccAuthToken);
+//     const mcc = require('./app/mcc.js');
+//     const challenge = `update_prescription:${prescriptionID}`;
+//     const isValid = mcc.verifySignature(mcc.decodeKey(publicKey), challenge, signature);
+//     if (!isValid) throw new Error('Invalid MCC token');
+
+//     const sharedSecret = mcc.generateSharedSecret(req.userPrivateKey, mcc.decodeKey(publicKey));
+//     const encrypted = mcc.encryptData(JSON.stringify(newData), sharedSecret);
+
+//     const response = await invoke.invokeChaincode(
+//       [peer],
+//       'patient-medication-channel',
+//       'mychaincode',
+//       'updatePrescription',
+//       [prescriptionID, receiverID, mccAuthToken, JSON.stringify(encrypted)],
+//       req.username,
+//       req.orgname
+//     );
+//     res.json({ result: response });
+//   } catch (err) {
+//     res.json({ error: err.message });
+//   }
+// });
+
+
+// Dispense Medication (pharmacist only). Expects: { prescriptionID, pharmacistID, status ("Dispensed"), billAmount }
+app.post('/dispenseMedication', async (req, res) => {
+  const {
+    prescriptionID,
+    pharmacistID,
+    status,
+    billAmount,
+    peers,
+    pharmacistPrivateKey,
+    doctorPublicKey,
+    mccAuthToken,
+    peer
+  } = req.body;
+
+  if (
+    !prescriptionID ||
+    !pharmacistID ||
+    !status ||
+    !billAmount ||
+    !pharmacistPrivateKey ||
+    !doctorPublicKey ||
+    !mccAuthToken ||
+    !peer
+  ) {
+    return res.json({
+      error: 'Missing required params: prescriptionID, pharmacistID, status, billAmount, pharmacistPrivateKey, doctorPublicKey, mccAuthToken, and peer'
+    });
+  }
+
+  try {
+    // Load MCC
+    const mcc = require('./app/mcc.js');
+
+    // Step 1: Verify MCC auth token
+    const { signature, publicKey } = JSON.parse(mccAuthToken);
+    const challenge = `access_prescription:${prescriptionID}`;
+    const isValid = mcc.verifySignature(
+      mcc.decodeKey(publicKey),
+      challenge,
+      signature
+    );
+
+    if (!isValid) {
+      return res.json({ error: 'Invalid MCC signature' });
+    }
+
+    // Step 2: Fetch the encrypted prescription from chaincode
+    const response = await invoke.invokeChaincode(
+      [peer],
+      'patient-medication-channel',
+      'mychaincode',
+      'getPrescription',
+      [prescriptionID, pharmacistID, mccAuthToken],
+      req.username,
+      req.orgname
+    );
+
+    const encrypted = JSON.parse(response);
+
+    // Step 3: Generate shared secret
+    const sharedSecret = mcc.generateSharedSecret(
+      mcc.decodeKey(pharmacistPrivateKey),
+      mcc.decodeKey(doctorPublicKey)
+    );
+
+    // Step 4: Decrypt prescription
+    const decryptedJson = mcc.decryptData(
+      encrypted.ciphertext,
+      encrypted.nonce,
+      sharedSecret
+    );
+
+    const prescription = JSON.parse(decryptedJson);
+
+    // Step 5: Update the prescription fields
+    prescription.Status = status;
+    prescription.BillAmount = parseFloat(billAmount);
+    prescription.PharmacistID = pharmacistID;
+    prescription.DispensedAt = new Date().toISOString();
+
+    // Step 6: Encrypt the updated prescription
+    const updatedEncrypted = mcc.encryptData(
+      JSON.stringify(prescription),
+      sharedSecret
+    );
+
+    // Step 7: Send encrypted update to chaincode
+    const message = await invoke.invokeChaincode(
+      peers,
+      'patient-medication-channel',
+      'mychaincode',
+      'dispenseMedication',
+      [prescriptionID, pharmacistID, JSON.stringify(updatedEncrypted)],
+      req.username,
+      req.orgname
+    );
+
+    res.json({ result: message });
+
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
+
+
+// ----- Billing Channel Endpoint -----
+
+// Billing (called by receptionist). Expects: { patientID, billAmount, status ("Paid") }
+app.post('/billing', async (req, res) => {
+  const { patientID, billAmount, status, peers } = req.body;
+  if (!patientID || !billAmount || !status) {
+    return res.json(getErrorMessage('patientID, billAmount, and status'));
+  }
+  try {
+    const message = await invoke.invokeChaincode(
+      peers,
+      "billing-channel",
+      "mychaincode",
+      "billing",
+      [patientID, billAmount, status],
+      req.username,
+      req.orgname
+    );
+    res.json({ result: message });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+// ----- Communication Channel Endpoints ----- //
+
+// Send Message (all roles allowed). Expects: { senderID, recipientID, message }
+app.post('/sendMessage', async (req, res) => {
+  const { senderID, recipientID, message, peers } = req.body;
+  if (!senderID || !recipientID || !message) {
+    return res.json(getErrorMessage('senderID, recipientID, and message'));
+  }
+  try {
+    const msg = await invoke.invokeChaincode(
+      peers,
+      "communication-channel",
+      "mychaincode",
+      "sendMessage",
+      [senderID, recipientID, message],
+      req.username,
+      req.orgname
+    );
+    res.json({ result: msg });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+// Get Messages (only sender can retrieve). Query: { senderID, peer }
+app.get('/getMessages', async (req, res) => {
+  const { senderID, peer } = req.query;
+  if (!senderID) {
+    return res.json(getErrorMessage('senderID'));
+  }
+  try {
+    const msg = await invoke.invokeChaincode(
+      [peer],
+      "communication-channel",
+      "mychaincode",
+      "getMessages",
+      [senderID],
+      req.username,
+      req.orgname
+    );
+    res.json({ result: msg });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+// ----- Query Endpoint -----
+
+// Query Patients by Doctor. Query: { doctorID, peer }
+app.get('/queryPatientsByDoctor', async (req, res) => {
+  const { doctorID, peer } = req.query;
+  if (!doctorID) {
+    return res.json(getErrorMessage('doctorID'));
+  }
+  try {
+    const result = await invoke.invokeChaincode(
+      [peer],
+      "patient-medication-channel",
+      "mychaincode",
+      "queryPatientsByDoctor",
+      [doctorID],
+      req.username,
+      req.orgname
+    );
+    res.json({ result });
+  } catch (error) {
+    res.json({ result: null, error: error.name, errorData: error.message });
+  }
+});
+
+module.exports = app;

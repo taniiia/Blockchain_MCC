@@ -12,7 +12,7 @@ else
 // indicate to the application where the setup file is located so it able
 // to have the hfc load it to initalize the fabric client instance
 hfc.setConfigSetting('network-connection-profile-path',path.join(__dirname, 'artifacts' ,file));
-hfc.setConfigSetting('Blr-connection-profile-path',path.join(__dirname, 'artifacts', 'blr.yaml'));
-hfc.setConfigSetting('Kpm-connection-profile-path',path.join(__dirname, 'artifacts', 'kpm.yaml'));
+hfc.setConfigSetting('Blr-connection-profile-path',path.join(__dirname, 'artifacts', 'PESUHospitalBLR.yaml'));
+hfc.setConfigSetting('Kpm-connection-profile-path',path.join(__dirname, 'artifacts', 'PESUHospitalKPM.yaml'));
 // some other settings the application might need to know
 hfc.addConfigFile(path.join(__dirname, 'config.json'));

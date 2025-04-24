@@ -1,111 +1,232 @@
 'use strict';
-var log4js = require('log4js');
-var logger = log4js.getLogger('Helper');
+
+const mcc = require('./mcc.js');
+const log4js = require('log4js');
+const logger = log4js.getLogger('Helper');
 logger.setLevel('DEBUG');
 
-var path = require('path');
-var util = require('util');
-
-var hfc = require('fabric-client');
+const path = require('path');
+const util = require('util');
+const hfc = require('fabric-client');
 hfc.setLogger(logger);
 
+//communicate with the blockchain network
+//enroll or authenticate user
+//interact with chaincode
+//This is your Fabric bootstrapper per org + user.
 async function getClientForOrg(userorg, username) {
-	logger.debug('getClientForOrg - ****** START %s %s', userorg, username)
-	// get a fabric client loaded with a connection profile for this org
-	let config = '-connection-profile-path';
-
-	// build a client context and load it with a connection profile
-	// lets only load the network settings and save the client for later
-	let client = hfc.loadFromConfig(hfc.getConfigSetting('network' + config));
-
-	// This will load a connection profile over the top of the current one one
-	// since the first one did not have a client section and the following one does
-	// nothing will actually be replaced.
-	// This will also set an admin identity because the organization defined in the
-	// client section has one defined
-	client.loadFromConfig(hfc.getConfigSetting(userorg + config));
-
-	// this will create both the state store and the crypto store based
-	// on the settings in the client section of the connection profile
-	await client.initCredentialStores();
-
-	// The getUserContext call tries to get the user from persistence.
-	// If the user has been saved to persistence then that means the user has
-	// been registered and enrolled. If the user is found in persistence
-	// the call will then assign the user to the client object.
-	if (username) {
-		let user = await client.getUserContext(username, true);
-		if (!user) {
-			throw new Error(util.format('User was not found :', username));
-		} else {
-			logger.debug('User %s was found to be registered and enrolled', username);
-		}
-	}
-	logger.debug('getClientForOrg - ****** END %s %s \n\n', userorg, username)
-
-	return client;
+  logger.debug('getClientForOrg START %s, %s', userorg, username);
+  const configSuffix = '-connection-profile-path';
+  const client = hfc.loadFromConfig(hfc.getConfigSetting('network' + configSuffix));
+  client.loadFromConfig(hfc.getConfigSetting(userorg + configSuffix));
+  await client.initCredentialStores();
+  if (username) {
+    let userObj = await client.getUserContext(username, true);
+    if (!userObj) {
+      throw new Error(util.format('User %s not found', username));
+    }
+    logger.debug('User %s is registered and enrolled', username);
+  }
+  logger.debug('getClientForOrg END %s, %s', userorg, username);
+  return client;
 }
 
-var getRegisteredUser = async function (username, userOrg, isJson) {
-	try {
-		var client = await getClientForOrg(userOrg);
-		logger.debug('Successfully initialized the credential stores');
-		// client can now act as an agent for organization Org1
-		// first check to see if the user is already enrolled
-		var user = await client.getUserContext(username, true);
-		if (user && user.isEnrolled()) {
-			logger.info('Successfully loaded member from persistence');
-		} else {
-			// user was not enrolled, so we will need an admin user object to register
-			logger.info('User %s was not enrolled, so we will need an admin user object to register', username);
-			var admins = hfc.getConfigSetting('admins');
-			let adminUserObj = await client.setUserContext({ username: admins[0].username, password: admins[0].secret });
-			let caClient = client.getCertificateAuthority();
-			let secret = await caClient.register({
-				enrollmentID: username,
-				affiliation: userOrg.toLowerCase() + '.department1',
-				attrs: [{ name: 'role', value: 'approver', ecert: true }]
-			}, adminUserObj);
-			// let secret = await caClient.register({
-			// 	enrollmentID: username,
-			// 	affiliation: userOrg.toLowerCase() + '.department1'
-			// }, adminUserObj);
-			logger.debug('Successfully got the secret for user %s', username);
-			user = await client.setUserContext({ username: username, password: secret, attr_reqs: [{ name: 'role', optional: false }] });
-			// user = await client.setUserContext({ username: username, password: secret });
-			logger.debug('Successfully enrolled username %s  and setUserContext on the client object', username);
-		}
-		if (user && user.isEnrolled) {
-			if (isJson && isJson === true) {
-				var response = {
-					success: true,
-					secret: user._enrollmentSecret,
-					message: username + ' enrolled Successfully',
-				};
-				return response;
-			}
-		} else {
-			throw new Error('User was not enrolled ');
-		}
-	} catch (error) {
-		logger.error('Failed to get registered user: %s with error: %s', username, error.toString());
-		return 'failed ' + error.toString();
-	}
+async function getRegisteredUser(username, userOrg, userRole, isJson) {
+  try {
+    const client = await getClientForOrg(userOrg, username);
+    logger.debug('Initialized credential stores');
+    let userObj = await client.getUserContext(username, true);
+    if (userObj && userObj.isEnrolled()) {
+      logger.info('Loaded member from persistence');
+    } else {
+      logger.info('User %s is not enrolled; registering...', username);
+      const admins = hfc.getConfigSetting('admins');
+      let adminUserObj = await client.setUserContext({ username: admins[0].username, password: admins[0].secret });
+      let caClient = client.getCertificateAuthority();
+      let secret = await caClient.register({
+        enrollmentID: username,
+        affiliation: userOrg.toLowerCase(),
+        attrs: [{ name: 'role', value: userRole, ecert: true }]
+      }, adminUserObj);
+      logger.debug('Got secret for user %s', username);
+      userObj = await client.setUserContext({ 
+        username: username, 
+        password: secret, 
+        attr_reqs: [{ name: 'role', optional: false }]
+      });
+      logger.debug('Enrolled user %s successfully', username);
+    }
+    if (userObj && userObj.isEnrolled()) {
+      // Generate an MCC key pair for off-chain cryptographic operations
+      // In a production system, you’d generate this once and store it securely.
+      const keyPair = mcc.generateKeyPair();
+      const mccPrivateKey = mcc.encodeKey(keyPair.secretKey); // Base64 string
+      const mccPublicKey = mcc.encodeKey(keyPair.publicKey);    // Base64 string
 
+      if (isJson) {
+        return {
+          success: true,
+          secret: userObj._enrollmentSecret,
+          message: `${username} enrolled Successfully`,
+          mccPrivateKey, // In production, avoid sending the private key back to the client!
+          mccPublicKey
+        };
+      }
+      return userObj;
+    }
+    throw new Error('User was not enrolled');
+  } catch (error) {
+    logger.error('Error in getRegisteredUser: %s', error.toString());
+    return 'failed ' + error.toString();
+  }
+}
+
+async function getRegisteredDoctor(username, userOrg, userRole, gender, specialisation, isJson) {
+
+  try {
+    const client = await getClientForOrg(userOrg, username);
+    logger.debug('Initialized credential stores for doctor');
+    let userObj = await client.getUserContext(username, true);
+
+    if (userObj && userObj.isEnrolled()) {
+      logger.info('Loaded doctor from persistence');
+    } else {
+      logger.info('Doctor %s is not enrolled; registering...', username);
+      const admins = hfc.getConfigSetting('admins');
+      let adminUserObj = await client.setUserContext({
+        username: admins[0].username,
+        password: admins[0].secret
+      });
+
+      const caClient = client.getCertificateAuthority();
+      const secret = await caClient.register({
+        enrollmentID: username,
+        affiliation: userOrg.toLowerCase(),
+        attrs: [
+          { name: 'role', value: userRole, ecert: true },
+          { name: 'gender', value: gender, ecert: true },
+          { name: 'specialisation', value: specialisation, ecert: true }
+        ]
+      }, adminUserObj);
+
+      logger.debug('Got secret for doctor %s', username);
+      userObj = await client.setUserContext({
+        username: username,
+        password: secret,
+        attr_reqs: [
+          { name: 'role', optional: false },
+          { name: 'gender', optional: false },
+          { name: 'specialisation', optional: false }
+        ]
+      });
+      logger.debug('Enrolled doctor %s successfully', username);
+    }
+
+    if (userObj && userObj.isEnrolled()) {
+      if (isJson) {
+        // Generate an MCC key pair using the mcc module
+        const keyPair = mcc.generateKeyPair();
+        const mccPrivateKey = mcc.encodeKey(keyPair.secretKey);
+        const mccPublicKey = mcc.encodeKey(keyPair.publicKey);
+        return {
+          success: true,
+          secret: userObj._enrollmentSecret,
+          message: `${username} enrolled successfully`,
+          mccPrivateKey,  // In production, avoid returning private keys!
+          mccPublicKey
+        };
+      }
+      return userObj;
+    }
+
+    throw new Error('Doctor was not enrolled');
+  } catch (error) {
+    logger.error('Error in getRegisteredDoctor: %s', error.toString());
+    return 'failed ' + error.toString();
+  }
+}
+
+async function getRegisteredPatient(username, userOrg, userRole, age, gender, isJson) {
+
+  try {
+    const client = await getClientForOrg(userOrg, username);
+    logger.debug('Initialized credential stores for patient');
+    let userObj = await client.getUserContext(username, true);
+
+    if (userObj && userObj.isEnrolled()) {
+      logger.info('Loaded patient from persistence');
+    } else {
+      logger.info('Patient %s is not enrolled; registering...', username);
+      const admins = hfc.getConfigSetting('admins');
+      let adminUserObj = await client.setUserContext({
+        username: admins[0].username,
+        password: admins[0].secret
+      });
+
+      const caClient = client.getCertificateAuthority();
+      const secret = await caClient.register({
+        enrollmentID: username,
+        affiliation: userOrg.toLowerCase(),
+        attrs: [
+          { name: 'role', value: userRole, ecert: true },
+          { name: 'age', value: age.toString(), ecert: true },
+          { name: 'gender', value: gender, ecert: true }
+        ]
+      }, adminUserObj);
+
+      logger.debug('Got secret for patient %s', username);
+      userObj = await client.setUserContext({
+        username: username,
+        password: secret,
+        attr_reqs: [
+          { name: 'role', optional: false },
+          { name: 'age', optional: false },
+          { name: 'gender', optional: false }
+        ]
+      });
+      logger.debug('Enrolled patient %s successfully', username);
+    }
+
+    if (userObj && userObj.isEnrolled()) {
+      if (isJson) {
+        // Generate an MCC key pair for the patient
+        const keyPair = mcc.generateKeyPair();
+        const mccPrivateKey = mcc.encodeKey(keyPair.secretKey);
+        const mccPublicKey = mcc.encodeKey(keyPair.publicKey);
+        return {
+          success: true,
+          secret: userObj._enrollmentSecret,
+          message: `${username} enrolled successfully`,
+          mccPrivateKey,  // In production, do not return the private key!
+          mccPublicKey
+        };
+      }
+      return userObj;
+    }
+
+    throw new Error('Patient was not enrolled');
+  } catch (error) {
+    logger.error('Error in getRegisteredPatient: %s', error.toString());
+    return 'failed ' + error.toString();
+  }
+}
+
+
+function setupChaincodeDeploy() {
+  process.env.GOPATH = path.join(__dirname, hfc.getConfigSetting('CC_SRC_PATH'));
+}
+
+function getLogger(moduleName) {
+  const log = log4js.getLogger(moduleName);
+  log.setLevel('DEBUG');
+  return log;
+}
+
+module.exports = {
+  getClientForOrg,
+  getRegisteredUser,
+  getRegisteredDoctor,
+  getRegisteredPatient,
+  setupChaincodeDeploy,
+  getLogger
 };
-
-
-var setupChaincodeDeploy = function () {
-	process.env.GOPATH = path.join(__dirname, hfc.getConfigSetting('CC_SRC_PATH'));
-};
-
-var getLogger = function (moduleName) {
-	var logger = log4js.getLogger(moduleName);
-	logger.setLevel('DEBUG');
-	return logger;
-};
-
-exports.getClientForOrg = getClientForOrg;
-exports.getLogger = getLogger;
-exports.setupChaincodeDeploy = setupChaincodeDeploy;
-exports.getRegisteredUser = getRegisteredUser;

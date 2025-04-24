@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require("path")
 const log4js = require('log4js');
 const logger = log4js.getLogger('BasicNetwork');
-const util = require('util')
+const util = require('util') 
 
 
 const helper = require('./helper')

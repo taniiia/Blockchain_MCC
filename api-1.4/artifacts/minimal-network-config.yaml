@@ -1,0 +1,52 @@
+name: "Minimal"
+x-type: "hlfv1"
+description: "Minimal profile for testing"
+version: "1.0"
+client:
+  organization: PESUHospitalBLR
+  connection:
+    timeout:
+      peer:
+        endorser: 300
+        eventHub: 300
+      orderer: 300
+  credentialStore:
+    path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/api-1.4/fabric-client-kv-blr"
+    cryptoStore:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/api-1.4/crypto/blr"
+organizations:
+  PESUHospitalBLR:
+    mspid: PESUHospitalBLRMSP
+    peers:
+      - peer0.blr.pesuhospital.com
+    certificateAuthorities:
+      - ca.blr.pesuhospital.com
+    adminPrivateKey:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/users/Admin@blr.pesuhospital.com/msp/keystore/priv_sk"
+    signedCert:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/users/Admin@blr.pesuhospital.com/msp/signcerts/Admin@blr.pesuhospital.com-cert.pem"
+orderers:
+  orderer.pesuhospital.com:
+    url: grpcs://localhost:7050
+    grpcOptions:
+      ssl-target-name-override: orderer.pesuhospital.com
+    tlsCACerts:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/artifacts/channel/crypto-config/ordererOrganizations/pesuhospital.com/orderers/orderer.pesuhospital.com/tls/ca.crt"
+peers:
+  peer0.blr.pesuhospital.com:
+    url: grpcs://localhost:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.blr.pesuhospital.com
+    tlsCACerts:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/peers/peer0.blr.pesuhospital.com/tls/ca.crt"
+certificateAuthorities:
+  ca.blr.pesuhospital.com:
+    url: https://localhost:7054
+    httpOptions:
+      verify: false
+    tlsCACerts:
+      path: "/home/tania/test-fabric/bc_mcc/BasicNetwork-2.0/artifacts/channel/crypto-config/peerOrganizations/blr.pesuhospital.com/ca/ca.blr.pesuhospital.com-cert.pem"
+    registrar:
+      - enrollId: admin
+        enrollSecret: adminpw
+    caName: ca.blr.pesuhospital.com

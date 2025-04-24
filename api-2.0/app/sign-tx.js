@@ -5,7 +5,7 @@
 // Step : 1 generate an unsigned transaction proposal with the identity's certificate
 
 const certPem = '<PEM encoded certificate content>';
-const mspId = 'Org1MSP'; // the msp Id for this org
+const mspId = 'PESUHospitalBLRMSP'; // the msp Id for this org
 
 const transactionProposal = {
     fcn: 'move',
@@ -36,7 +36,7 @@ const { prvKeyHex } = KEYUTIL.getKey(privateKeyPEM); // convert the pem encoded 
 
 const EC = elliptic.ec;
 const ecdsaCurve = elliptic.curves['p256'];
-
+   
 const ecdsa = new EC(ecdsaCurve);
 const signKey = ecdsa.keyFromPrivate(prvKeyHex, 'hex');
 const sig = ecdsa.sign(Buffer.from(digest, 'hex'), signKey);

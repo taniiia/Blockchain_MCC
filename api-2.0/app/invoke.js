@@ -1,101 +1,93 @@
-const { Gateway, Wallets, TxEventHandler, GatewayOptions, DefaultEventHandlerStrategies, TxEventHandlerFactory } = require('fabric-network');
+'use strict';
+
+const { Gateway, Wallets, DefaultEventHandlerStrategies } = require('fabric-network');
 const fs = require('fs');
-const path = require("path")
+const path = require('path');
 const log4js = require('log4js');
 const logger = log4js.getLogger('BasicNetwork');
-const util = require('util')
+log4js.configure({
+    appenders: { out: { type: 'console' } },
+    categories: { default: { appenders: ['out'], level: 'debug' } }
+  });
+const util = require('util');
 
-const helper = require('./helper')
+const helper = require('./helper');
 
-const invokeTransaction = async (channelName, chaincodeName, fcn, args, username, org_name, transientData) => {
+async function invokeTransaction(channelName, chaincodeName, fcn, args, username, org_name, transientData) {
     try {
-        logger.debug(util.format('\n============ invoke transaction on channel %s ============\n', channelName));
+        logger.debug(util.format('\n============ Invoke transaction on channel %s, function %s ============\n', channelName, fcn));
 
-        // load the network configuration
-        // const ccpPath =path.resolve(__dirname, '..', 'config', 'connection-org1.json');
-        // const ccpJSON = fs.readFileSync(ccpPath, 'utf8')
-        const ccp = await helper.getCCP(org_name) //JSON.parse(ccpJSON);
+        // Load network configuration (CCP)
+        const ccp = await helper.getCCP(org_name);
 
-        // Create a new file system based wallet for managing identities.
-        const walletPath = await helper.getWalletPath(org_name) //path.join(process.cwd(), 'wallet');
+        // Create a wallet using the filesystem-based wallet
+        const walletPath = await helper.getWalletPath(org_name);
         const wallet = await Wallets.newFileSystemWallet(walletPath);
-        console.log(`Wallet path: ${walletPath}`);
+        logger.debug(`Wallet path: ${walletPath}`);
 
-        // Check to see if we've already enrolled the user.
+        // Check to see if the identity exists in the wallet
         let identity = await wallet.get(username);
         if (!identity) {
-            console.log(`An identity for the user ${username} does not exist in the wallet, so registering user`);
-            await helper.getRegisteredUser(username, org_name, true)
-            identity = await wallet.get(username);
-            console.log('Run the registerUser.js application before retrying');
-            return;
+            logger.error(`An identity for the user ${username} does not exist in the wallet`);
+            throw new Error(`An identity for the user ${username} does not exist in the wallet. Run the registration process first.`);
         }
 
-        
-
+        // Set up connection options
         const connectOptions = {
-            wallet, identity: username, discovery: { enabled: true, asLocalhost: true },
+            wallet,
+            identity: username,
+            discovery: { enabled: true, asLocalhost: true },
             eventHandlerOptions: {
                 commitTimeout: 100,
                 strategy: DefaultEventHandlerStrategies.NETWORK_SCOPE_ALLFORTX
             }
-            // transaction: {
-            //     strategy: createTransactionEventhandler()
-            // }
-        }
+        };
 
-        // Create a new gateway for connecting to our peer node.
+        // Create a new gateway for connecting to our peer node
         const gateway = new Gateway();
         await gateway.connect(ccp, connectOptions);
 
         // Get the network (channel) our contract is deployed to.
         const network = await gateway.getNetwork(channelName);
 
+        // Get the contract from the network.
         const contract = network.getContract(chaincodeName);
 
-        let result
-        let message;
-        if (fcn === "createCar" || fcn === "createPrivateCarImplicitForOrg1"
-            || fcn == "createPrivateCarImplicitForOrg2") {
-            result = await contract.submitTransaction(fcn, args[0], args[1], args[2], args[3], args[4]);
-            message = `Successfully added the car asset with key ${args[0]}`
-
-        } else if (fcn === "changeCarOwner") {
-            result = await contract.submitTransaction(fcn, args[0], args[1]);
-            message = `Successfully changed car owner with key ${args[0]}`
-        } else if (fcn == "createPrivateCar" || fcn =="updatePrivateData") {
-            console.log(`Transient data is : ${transientData}`)
-            let carData = JSON.parse(transientData)
-            console.log(`car data is : ${JSON.stringify(carData)}`)
-            let key = Object.keys(carData)[0]
-            const transientDataBuffer = {}
-            transientDataBuffer[key] = Buffer.from(JSON.stringify(carData.car))
+        let result;
+        // If transientData is provided, attach it to the transaction.
+        if (transientData) {
+            const transientDataBuffer = {};
+            // Each key in transientData is set into the transaction as a Buffer containing a JSON string.
+            Object.keys(transientData).forEach(key => {
+                transientDataBuffer[key] = Buffer.from(JSON.stringify(transientData[key]));
+            });
             result = await contract.createTransaction(fcn)
                 .setTransient(transientDataBuffer)
-                .submit()
-            message = `Successfully submitted transient data`
-        }
-        else {
-            return `Invocation require either createCar or changeCarOwner as function but got ${fcn}`
+                .submit(...args);
+        } else {
+            result = await contract.submitTransaction(fcn, ...args);
         }
 
+        // Disconnect the gateway once the transaction has been submitted.
         await gateway.disconnect();
 
-        result = JSON.parse(result.toString());
-
-        let response = {
-            message: message,
-            result
+        // Parse the result as JSON.
+        let parsedResult = {};
+        try {
+            parsedResult = JSON.parse(result.toString());
+        } catch (e) {
+            parsedResult = result.toString();
         }
 
+        let response = {
+            message: `Transaction ${fcn} has been submitted successfully`,
+            result: parsedResult
+        };
+
         return response;
-
-
     } catch (error) {
-
-        console.log(`Getting error: ${error}`)
-        return error.message
-
+        logger.error(`Error in invokeTransaction: ${error}`);
+        throw new Error(`Failed to submit transaction: ${error.message}`);
     }
 }
 

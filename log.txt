@@ -1,7 +1,6 @@
 Installed chaincodes on peer:
-Package ID: medical_2:9ccc4812a5bbc279ab875962b9feb3bcd97b9bc81a536385aeb3fda8b2fc31b6, Label: medical_2
-Package ID: medical_1:6ebf64d71a6a37380fd15eb6198080ffbb3576edfd1fbb570229361b9b2a3876, Label: medical_1
-Package ID: medical_1:d87fef9f3a926671a5a9c2016f84b3f14d6e3c062ba955d7555b3ca3e2c01f82, Label: medical_1
-Package ID: medical_3:d5274b1af45e9fc55a1d1d9a55aa3ac558d13356e36a046d94aaccbd83b6b9dd, Label: medical_3
-Package ID: medical_1:10bbd50276d7f97dd8f8a14a8cab06e7c40284224c025c081b3cd6d46a391fd5, Label: medical_1
-Package ID: medical_1:771b8c25b6bb77972cf5de79dc7afa61a2a7d3236a29330cf204c2a83807e346, Label: medical_1
+Package ID: mychaincode_3:bf0e16218c6fb9dad424460fb433360577e72f8a05fda57defad32c6cf33a3cf, Label: mychaincode_3
+Package ID: mychaincode_4:78b5117afd4b27e502e337cda22e91c0fe292614e80fe5840eef1cfc96e218ca, Label: mychaincode_4
+Package ID: mychaincode_1:0c6251441cad3c0ea75e05599f95986ca9cb61c498d36adce751b994d398dcc0, Label: mychaincode_1
+Package ID: mychaincode_1:d4a70caa7edc2a19f3461296276b69b836d0b3a0cde758faecc718a491809afa, Label: mychaincode_1
+Package ID: mychaincode_2:9a72e95b6f6106073b4f3df05e1e032ae53d50941b87ea84feade4b963209044, Label: mychaincode_2

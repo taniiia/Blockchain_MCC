@@ -1,88 +1,74 @@
-/**
- * Copyright 2017 IBM All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 'use strict';
-var util = require('util');
-var helper = require('./helper.js');
-var logger = helper.getLogger('install-chaincode');
 
-var installChaincode = async function(peers, chaincodeName, chaincodePath,
-	chaincodeVersion, chaincodeType, username, org_name) {
-	logger.debug('\n\n============ Install chaincode on organizations ============\n');
-	helper.setupChaincodeDeploy();
+const util = require('util');
+const path = require('path');
+const helper = require('./helper.js');
+const logger = helper.getLogger('Install-Chaincode');
+
+const installChaincode = async function (peers, chaincodeName, chaincodePath, chaincodeVersion, chaincodeType, username, orgName) {
+	logger.debug('\n\n============ Install chaincode on organization "%s" ============\n', orgName);
 	let error_message = null;
+
 	try {
-		logger.info('Calling peers in organization "%s" to join the channel', org_name);
+		// Set up the client for this org
+		const client = await helper.getClientForOrg(orgName, username);
+		logger.debug('Successfully got the fabric client for the organization "%s"', orgName);
 
-		// first setup the client for this org
-		var client = await helper.getClientForOrg(org_name, username);
-		logger.debug('Successfully got the fabric client for the organization "%s"', org_name);
+		// Chaincode path must be absolute or relative to GOPATH/src for Go chaincode
+		let chaincodePackagePath = chaincodePath;
+		if (!path.isAbsolute(chaincodePath)) {
+			chaincodePackagePath = path.join(__dirname, '..', chaincodePath); // fallback
+		}
 
-		var request = {
+		const request = {
 			targets: peers,
-			chaincodePath: chaincodePath,
+			chaincodePath: chaincodePackagePath,
 			chaincodeId: chaincodeName,
 			chaincodeVersion: chaincodeVersion,
-			chaincodeType: chaincodeType
+			chaincodeType: chaincodeType // 'golang'
 		};
-		let results = await client.installChaincode(request);
-		// the returned object has both the endorsement results
-		// and the actual proposal, the proposal will be needed
-		// later when we send a transaction to the orederer
-		var proposalResponses = results[0];
-		var proposal = results[1];
 
-		// lets have a look at the responses to see if they are
-		// all good, if good they will also include signatures
-		// required to be committed
-		var all_good = true;
-		for (var i in proposalResponses) {
-			let one_good = false;
-			if (proposalResponses && proposalResponses[i].response &&
-				proposalResponses[i].response.status === 200) {
-				one_good = true;
-				logger.info('install proposal was good');
+		const results = await client.installChaincode(request);
+		const proposalResponses = results[0];
+
+		let allGood = true;
+		for (let i in proposalResponses) {
+			const res = proposalResponses[i];
+			if (res && res.response && res.response.status === 200) {
+				logger.info(`Install proposal was good for peer ${peers[i]}`);
 			} else {
-				logger.error('install proposal was bad %j',proposalResponses.toJSON());
+				allGood = false;
+				logger.error(`Install proposal was bad for peer ${peers[i]}:`, res);
 			}
-			all_good = all_good & one_good;
 		}
-		if (all_good) {
-			logger.info('Successfully sent install Proposal and received ProposalResponse');
+
+		if (allGood) {
+			const message = `Successfully installed chaincode "${chaincodeName}" version "${chaincodeVersion}" on org "${orgName}"`;
+			logger.info(message);
+			return {
+				success: true,
+				message
+			};
 		} else {
-			error_message = 'Failed to send install Proposal or receive valid response. Response null or status is not 200'
+			error_message = 'Some install proposals failed';
 			logger.error(error_message);
 		}
-	} catch(error) {
-		logger.error('Failed to install due to error: ' + error.stack ? error.stack : error);
+
+	} catch (error) {
+		logger.error('Failed to install chaincode due to error:', error.stack || error);
 		error_message = error.toString();
 	}
 
 	if (!error_message) {
-		let message = util.format('Successfully installed chaincode');
-		logger.info(message);
-		// build a response to send back to the REST caller
-		let response = {
+		return {
 			success: true,
-			message: message
+			message: 'Chaincode installed successfully'
 		};
-		return response;
 	} else {
-		let message = util.format('Failed to install due to:%s',error_message);
-		logger.error(message);
-		throw new Error(message);
+		throw new Error(`Failed to install chaincode: ${error_message}`);
 	}
 };
-exports.installChaincode = installChaincode;
+
+module.exports = {
+	installChaincode
+};

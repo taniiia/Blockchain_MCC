@@ -19,12 +19,12 @@
       border:none; border-radius:4px; cursor:pointer;
     }
     button:hover { background:#0056b3; }
-  </style>
+  </style> 
 </head>
 <body>
-  <h1>Create Prescription as <%= username %></h1>
+  <h1>Create Prescription (Doctor: <%= username %>)</h1>
 
-  <form method="POST" action="/createPrescription">
+  <form id="prescForm" method="POST" action="/createPrescription">
     <input type="hidden" name="doctorID" value="<%= doctorID %>"/>
     <input type="hidden" name="peers"     value='<%= JSON.stringify(peers) %>'/>
 
@@ -58,5 +58,40 @@
 
     <button type="submit">Submit Prescription</button>
   </form>
+
+  <div id ="status" style="margin: top 1em;color: green;"></div>
+  <script>
+    document.getElementById('prescForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        patientID:      f.patientID.value,
+        pharmacistID:   f.pharmacistID.value,
+        medications:    f.medications.value,
+        billAmount:     f.billAmount.value,   // note correct casing
+        status:         f.status.value,
+        peers:          JSON.parse(f.peers.value),
+        doctorID:       f.doctorID.value      // if you need to include this
+      };
+  
+      try {
+        const res = await fetch('/createPrescription', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+        if (json.success) {
+          document.getElementById('status').innerText = "Prescription created successfully!";
+        } else {
+          throw new Error(json.message || JSON.stringify(json));
+        }
+      } catch (err) {
+        document.getElementById('status').style.color = 'red';
+        document.getElementById('status').innerText = err.message;
+      }
+    });
+  </script>  
 </body>
 </html>

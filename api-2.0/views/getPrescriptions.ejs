@@ -8,7 +8,7 @@
     body { font-family: sans-serif; padding: 1em; }
     label, select, button { display: block; margin-top: .5em; }
     select { width: 100%; padding: .5em; }
-    .error { color: red; }
+    .error   { color: red; }
     .details { margin-top: 1em; }
     .details li { margin-bottom: .25em; }
   </style>
@@ -25,7 +25,7 @@
     <select name="prescID" id="prescID" required>
       <% if (prescriptions.length) { %>
         <% prescriptions.forEach(id => { %>
-          <option value="<%= id %>"><%= id %></option>
+          <option value="<%= id %>" <%= selected===id?'selected':'' %>><%= id %></option>
         <% }) %>
       <% } else { %>
         <option disabled>No prescriptions available</option>
@@ -39,23 +39,13 @@
     <p class="error"><%= error %></p>
   <% } %>
 
-  <% if (result) { %>
-    <h2>Prescription</h2>
-    <table>
-      <tr><th>Field</th><th>Value</th></tr>
-      <% Object.entries(result).forEach(([key, value]) => { %>
-        <tr>
-          <td><%= key %></td>
-          <td>
-            <% if (typeof value === 'object') { %>
-              <pre><%= JSON.stringify(value, null, 2) %></pre>
-            <% } else { %>
-              <%= value %>
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </table>
+  <% if (prescription) { %>
+    <h2>Decrypted Prescription</h2>
+    <ul class="details">
+      <li><strong>Medications:</strong>     <%= prescription.medications.join(', ') %></li>
+      <li><strong>Bill Amount:</strong>     ₹<%= prescription.billAmount %></li>
+      <li><strong>Status:</strong>          <%= prescription.status %></li>
+    </ul>
   <% } %>
 </body>
 </html>

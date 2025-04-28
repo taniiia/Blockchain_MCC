@@ -790,6 +790,11 @@ app.get('/createPrescription', async (req, res) => {
     const me       = await query.getUserByUsername(req.username, req.username, req.orgName);
     const doctorID = me.uuid;
 
+    const keyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const { mccEncryptionPrivateKey, mccEncryptionPublicKey } = JSON.parse(
+      fs.readFileSync(keyFile)
+    );
+
     const peers = req.orgName === 'PESUHospitalBLR'
       ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
       : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
@@ -799,6 +804,8 @@ app.get('/createPrescription', async (req, res) => {
       doctorID,
       patients,
       pharmacists,
+      doctorEncryptionPrivateKey: mccEncryptionPrivateKey,
+      doctorEncryptionPublicKey: mccEncryptionPublicKey,
       peers
     });
   } catch (err) {
@@ -809,38 +816,36 @@ app.get('/createPrescription', async (req, res) => {
 
 // POST submission
 app.post('/createPrescription', async (req, res) => {
-  const {
-    patientID,
-    doctorID,
-    pharmacistID,
-    medications,
-    billAmount,
-    status,
-    peers
-  } = req.body;
+  if (req.role !== 'doctor') {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
 
-  if (!patientID || !doctorID || !pharmacistID ||
-      !medications || billAmount == null || !status) {
+  const { patientID, doctorID, pharmacistID, medications, billAmount, status, peers } = req.body;
+  if (!patientID || !doctorID || !pharmacistID || !medications || billAmount == null || !status) {
     return res.status(400).send('Missing required fields');
   }
 
   try {
-    // 1) Load doctor’s box private key
-    const docKeys = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'mcc-keys', `${req.username}.json`), 'utf8')
-    );
+    // Load keys
+    const doctorKeyFile   = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const patientLogin    = patientID.split(':')[1];
+    const pharmacistLogin = pharmacistID.split(':')[1];
+
+    const docKeys = JSON.parse(fs.readFileSync(doctorKeyFile, 'utf8'));
+    const patKeys = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'mcc-keys', `${patientLogin}.json`), 'utf8'
+    ));
+    const phKeys  = JSON.parse(fs.readFileSync(
+      path.join(__dirname, 'mcc-keys', `${pharmacistLogin}.json`), 'utf8'
+    ));
+
+    // Derive shared secret (doctor ↔ pharmacist)
     const docPriv = mcc.decodeKey(docKeys.mccEncryptionPrivateKey);
+    const phPub   = mcc.decodeKey(phKeys.mccEncryptionPublicKey);
+    const shared  = mcc.generateSharedSecret(docPriv, phPub);
 
-    // 2) Load pharmacist’s public key
-    const phLogin = pharmacistID.split(':')[1];
-    const phKeys  = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'mcc-keys', `${phLogin}.json`), 'utf8')
-    );
-    const phPub = mcc.decodeKey(phKeys.mccEncryptionPublicKey);
-
-    // 3) Derive shared secret & encrypt
-    const shared = mcc.generateSharedSecret(docPriv, phPub);
-    const payloadData = {
+    // Encrypt the prescription data
+    const prescriptionData = {
       patientID,
       doctorID,
       pharmacistID,
@@ -848,15 +853,16 @@ app.post('/createPrescription', async (req, res) => {
       billAmount:  parseFloat(billAmount),
       status
     };
-    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(payloadData), shared);
+    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(prescriptionData), shared);
 
+    // Build the JSON payload your chaincode expects
     const encryptedPayload = JSON.stringify({
       ciphertext,
       nonce,
       senderPublicKey: docKeys.mccEncryptionPublicKey
     });
 
-    // 4) Call chaincode (4 args)
+    // Invoke chaincode (now passing 4 args)
     await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
@@ -867,33 +873,41 @@ app.post('/createPrescription', async (req, res) => {
       peers || null
     );
 
-    res.send('Prescription submitted successfully!');
+    res.json({ success: true, message: 'Prescription submitted successfully' });
   } catch (err) {
     console.error('POST /createPrescription error:', err);
-    res.status(500).send('Failed to submit prescription');
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
+
 // ─── GET /getPrescriptions ─────────────────────────────────────────
+// ─── GET /getPrescriptions ───────────────────────────────────────────
 app.get('/getPrescriptions', async (req, res) => {
   if (req.role !== 'pharmacist') {
     return res.status(403).send('Forbidden');
   }
 
+  const username = req.username;
   let prescriptions = [];
   let loadError     = null;
   let pharmacistID  = null;
+  let selected      = null;
 
   try {
-    // 1) find your full on‐chain UUID
+    // 1) fetch your on‐chain pharmacist record by login-name
     const me = await query.getUserByUsername(
-      req.username, req.username, req.orgName
+      username, // searchUsername
+      username, // wallet identity
+      req.orgName
     );
-    pharmacistID = me.uuid;
+    pharmacistID = me.uuid;  // e.g. "user:tania:..."
 
-    // 2) list your private prescriptions
+    // 2) fetch *private* prescriptions for that pharmacistID
     const rawKeys = await query.queryPrescriptionsByPharmacist(
-      pharmacistID, req.username, req.orgName
+      pharmacistID,
+      username,
+      req.orgName
     );
     prescriptions = Array.isArray(rawKeys) ? rawKeys : [];
 
@@ -902,56 +916,62 @@ app.get('/getPrescriptions', async (req, res) => {
     loadError = 'Could not load your prescriptions. Try again later.';
   }
 
+  // Render with a full, consistent context
   res.render('getPrescriptions', {
-    username : req.username,
+    username,
     pharmacistID,
     prescriptions,
     loadError,
-    result:   null,
+    selected,           // no prescription chosen yet
+    prescription: null, // decrypted data
     error:    null
   });
 });
 
 
-// ─── POST /getPrescriptions ────────────────────────────────────────
+// ─── POST /getPrescriptions ──────────────────────────────────────────
 app.post('/getPrescriptions', async (req, res) => {
   if (req.role !== 'pharmacist') {
     return res.status(403).send('Forbidden');
   }
 
+  const username     = req.username;
   const { prescID, pharmacistID } = req.body;
   if (!prescID || !pharmacistID) {
     return res.status(400).send('Must select a prescription');
   }
 
-  // re-fetch for dropdown
+  // Re-fetch dropdown list
   let prescriptions = [];
   try {
     const rawKeys = await query.queryPrescriptionsByPharmacist(
-      pharmacistID, req.username, req.orgName
+      pharmacistID,
+      username,
+      req.orgName
     );
     prescriptions = Array.isArray(rawKeys) ? rawKeys : [];
-  } catch { /* ignore */ }
+  } catch (_) { /* ignore */ }
 
   try {
-    // load pharmacist’s MCC keys
-    const keyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
-    const {
-      mccEncryptionPrivateKey,
-      mccSigningPrivateKey,
-      mccSigningPublicKey
-    } = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+    // Load pharmacist’s MCC keys
+    const keyFile = path.join(__dirname, 'mcc-keys', `${username}.json`);
+    const { mccEncryptionPrivateKey, mccSigningPrivateKey, mccSigningPublicKey } =
+      JSON.parse(fs.readFileSync(keyFile, 'utf8'));
 
-    // sign short challenge
+    // Build & sign challenge
     const challenge    = `access_prescription:${prescID}`;
     const signature    = mcc.signMessage(mccSigningPrivateKey, challenge);
     const mccAuthToken = { publicKey: mccSigningPublicKey, signature };
 
-    // fetch encrypted blob
-    const tx     = await invoke.invokeTransaction(
-      'patient-medication-channel','mychaincode','getPrescription',
+    // Fetch the encrypted prescription
+    const tx = await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'getPrescription',
       [ prescID, pharmacistID, JSON.stringify(mccAuthToken) ],
-      req.username, req.orgName, null
+      username,
+      req.orgName,
+      null
     );
     const raw     = tx.result;
     const payload = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -960,7 +980,7 @@ app.post('/getPrescriptions', async (req, res) => {
       throw new Error('Malformed prescription: missing encrypted field');
     }
 
-    // decrypt
+    // Decrypt with shared secret
     const sharedSecret = mcc.generateSharedSecret(
       mcc.decodeKey(mccEncryptionPrivateKey),
       mcc.decodeKey(payload.encrypted.senderPublicKey)
@@ -972,27 +992,30 @@ app.post('/getPrescriptions', async (req, res) => {
     );
     const result = JSON.parse(plaintext);
 
-    // render everything in one shot
+    // Render the template with decrypted data and IDs
     res.render('getPrescriptions', {
-      username : req.username,
+      username,
       pharmacistID,
       prescriptions,
-      result,
-      error: null
+      selected:      prescID,
+      prescription:  result,
+      loadError:     null,
+      error:         null
     });
 
   } catch (err) {
     console.error('POST /getPrescriptions error:', err);
     res.render('getPrescriptions', {
-      username : req.username,
+      username,
       pharmacistID,
       prescriptions,
-      result: null,
-      error:  err.message
+      selected:      prescID,
+      prescription:  null,
+      loadError:     null,
+      error:         err.message
     });
   }
 });
-
 
 
 app.post('/dispenseMedication', async (req, res) => {

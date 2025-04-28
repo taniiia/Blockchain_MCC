@@ -4,91 +4,72 @@ const { Gateway, Wallets, DefaultEventHandlerStrategies } = require('fabric-netw
 const fs = require('fs');
 const path = require('path');
 const log4js = require('log4js');
-const logger = log4js.getLogger('BasicNetwork');
-log4js.configure({
-    appenders: { out: { type: 'console' } },
-    categories: { default: { appenders: ['out'], level: 'debug' } }
-  });
 const util = require('util');
-
 const helper = require('./helper');
 
+log4js.configure({
+  appenders: { out: { type: 'console' } },
+  categories: { default: { appenders: ['out'], level: 'debug' } }
+});
+const logger = log4js.getLogger('BasicNetwork');
+
 async function invokeTransaction(channelName, chaincodeName, fcn, args, username, org_name, transientData) {
-    try {
-        logger.debug(util.format('\n============ Invoke transaction on channel %s, function %s ============\n', channelName, fcn));
+  try {
+    logger.debug(util.format(
+      '\n============ Invoke transaction on channel %s, function %s ============\n',
+      channelName, fcn
+    ));
 
-        // Load network configuration (CCP)
-        const ccp = await helper.getCCP(org_name);
+    // 1) CCP & wallet
+    const ccp = await helper.getCCP(org_name);
+    const walletPath = await helper.getWalletPath(org_name);
+    const wallet = await Wallets.newFileSystemWallet(walletPath);
+    logger.debug(`Wallet path: ${walletPath}`);
 
-        // Create a wallet using the filesystem-based wallet
-        const walletPath = await helper.getWalletPath(org_name);
-        const wallet = await Wallets.newFileSystemWallet(walletPath);
-        logger.debug(`Wallet path: ${walletPath}`);
+    // 2) Gateway connect with extended commitTimeout
+    const gateway = new Gateway();
+    await gateway.connect(ccp, {
+      wallet,
+      identity: username,
+      discovery: { enabled: true, asLocalhost: true },
+      eventHandlerOptions: {
+        commitTimeout: 30,                                   // ← wait up to 30s
+        strategy: DefaultEventHandlerStrategies.NETWORK_SCOPE_ALLFORTX
+      }
+    });
 
-        // Check to see if the identity exists in the wallet
-        let identity = await wallet.get(username);
-        if (!identity) {
-            logger.error(`An identity for the user ${username} does not exist in the wallet`);
-            throw new Error(`An identity for the user ${username} does not exist in the wallet. Run the registration process first.`);
-        }
+    // 3) Get network & contract
+    const network = await gateway.getNetwork(channelName);
+    const contract = network.getContract(chaincodeName);
 
-        // Set up connection options
-        const connectOptions = {
-            wallet,
-            identity: username,
-            discovery: { enabled: true, asLocalhost: true },
-            eventHandlerOptions: {
-                commitTimeout: 100,
-                strategy: DefaultEventHandlerStrategies.NETWORK_SCOPE_ALLFORTX
-            }
-        };
-
-        // Create a new gateway for connecting to our peer node
-        const gateway = new Gateway();
-        await gateway.connect(ccp, connectOptions);
-
-        // Get the network (channel) our contract is deployed to.
-        const network = await gateway.getNetwork(channelName);
-
-        // Get the contract from the network.
-        const contract = network.getContract(chaincodeName);
-
-        let result;
-        // If transientData is provided, attach it to the transaction.
-        if (transientData) {
-            const transientDataBuffer = {};
-            // Each key in transientData is set into the transaction as a Buffer containing a JSON string.
-            Object.keys(transientData).forEach(key => {
-                transientDataBuffer[key] = Buffer.from(JSON.stringify(transientData[key]));
-            });
-            result = await contract.createTransaction(fcn)
-                .setTransient(transientDataBuffer)
-                .submit(...args);
-        } else {
-            result = await contract.submitTransaction(fcn, ...args);
-        }
-
-        // Disconnect the gateway once the transaction has been submitted.
-        await gateway.disconnect();
-
-        // Parse the result as JSON.
-        let parsedResult = {};
-        try {
-            parsedResult = JSON.parse(result.toString());
-        } catch (e) {
-            parsedResult = result.toString();
-        }
-
-        let response = {
-            message: `Transaction ${fcn} has been submitted successfully`,
-            result: parsedResult
-        };
-
-        return response;
-    } catch (error) {
-        logger.error(`Error in invokeTransaction: ${error}`);
-        throw new Error(`Failed to submit transaction: ${error.message}`);
+    // 4) Submit (with or without transient data)
+    let result;
+    if (transientData) {
+      const transientDataBuffer = {};
+      for (const k of Object.keys(transientData)) {
+        transientDataBuffer[k] = Buffer.from(JSON.stringify(transientData[k]));
+      }
+      result = await contract.createTransaction(fcn)
+        .setTransient(transientDataBuffer)
+        .submit(...args);
+    } else {
+      result = await contract.submitTransaction(fcn, ...args);
     }
+
+    // 5) Disconnect & parse
+    await gateway.disconnect();
+    let parsedResult;
+    try { parsedResult = JSON.parse(result.toString()); }
+    catch { parsedResult = result.toString(); }
+
+    return {
+      message: `Transaction ${fcn} has been submitted successfully`,
+      result: parsedResult
+    };
+  } catch (error) {
+    logger.error(`Error in invokeTransaction: ${error}`);
+    throw new Error(`Failed to submit transaction: ${error.message}`);
+  }
 }
 
 exports.invokeTransaction = invokeTransaction;

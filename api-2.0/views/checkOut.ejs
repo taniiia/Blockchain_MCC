@@ -21,8 +21,8 @@
       <% }); %>
     </select><br/><br/>
 
-    <label>Info (JSON):</label><br/>
-    <textarea name="patientInfo" rows="3" required></textarea><br/><br/>
+    <label>Message:</label><br/>
+    <textarea name="patientInfo" rows="3" placeholder="Type your message here…" required></textarea><br/><br/>
 
     <label>Status:</label>
     <input type="text" name="status" required /><br/><br/>
@@ -42,7 +42,7 @@
       const body = {
         patientID:   f.patientID.value,
         doctorID:    f.doctorID.value,
-        patientInfo: f.patientInfo.value,
+        patientInfo: f.patientInfo.value,  // now plain text
         status:      f.status.value,
         peers:       JSON.parse(f.peers.value)
       };
@@ -54,10 +54,11 @@
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        document.getElementById('message').innerText = 'Checked-out.';
+        document.getElementById('message').innerText = 'Checked-out and message sent to patient.';
       } else {
+        document.getElementById('message').style.color = 'red';
         document.getElementById('message').innerText =
-          'Error: ' + (result.errorData || JSON.stringify(result));
+          'Error: ' + (result.message || JSON.stringify(result));
       }
     });
   </script>

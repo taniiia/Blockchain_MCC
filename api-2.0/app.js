@@ -396,30 +396,68 @@ app.get('/patientCheckIn', async (req, res) => {
 
 
 // Patient check-in (Registration channel). Expects: { patientID, doctorID, patientInfo, status, peers }
+// Patient check-in (Receptionist) + automatic sendMessage
 app.post('/patientCheckIn', async (req, res) => {
   if (req.role !== 'receptionist') {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
   const { patientID, doctorID, patientInfo, status, peers } = req.body;
   if (!patientID || !doctorID || !patientInfo || !status) {
-    return res.status(400).json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
+    return res.status(400).json(getErrorMessage(
+      'patientID, doctorID, patientInfo, and status'
+    ));
   }
+
   try {
+    // 1) Do the check-in
     const start = Date.now();
-    const message = await invoke.invokeTransaction(
+    const checkinResult = await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
       'patientCheckIn',
       [ patientID, doctorID, JSON.stringify(patientInfo), status ],
       req.username,
       req.orgName,
-      peers       // ← now passing the peers from the form
+      peers
     );
-    res.json({ result: message, latency: Date.now() - start });
+
+    // 2) Look up your own on-chain UUID (as sender)
+    const me = await query.getUserByUsername(
+      req.username,   // search for the receptionist
+      req.username,
+      req.orgName
+    );
+    const senderID = me.uuid;
+
+    // 3) Build and send the “assigned doctor” message
+    const message = `You’ve been assigned a doctor (${doctorID})`;
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'sendMessage',
+      [ senderID, patientID, message ],
+      req.username,
+      req.orgName,
+      peers
+    );
+
+    // 4) Return both results & latency
+    return res.json({
+      success:        true,
+      checkinResult,
+      latency:        Date.now() - start
+    });
+
   } catch (error) {
-    res.status(500).json({ result: null, error: error.name, errorData: error.message });
+    console.error('POST /patientCheckIn error:', error);
+    return res.status(500).json({
+      success: false,
+      error:   error.name,
+      details: error.message
+    });
   }
 });
+
 
 // ─── Render Check-Out form ───
 app.get('/checkOut', async (req, res) => {
@@ -448,27 +486,54 @@ app.get('/checkOut', async (req, res) => {
 
 // Check-out (Registration channel). Expects: { patientID, doctorID, patientInfo, status, peers }
 // Submission endpoint (protected)
+
+// Patient check-out (Receptionist) + automatic sendMessage
+// Check-out (Registration channel). Expects: { patientID, doctorID, message, status, peers }
 app.post('/checkOut', async (req, res) => {
   if (req.role !== 'receptionist') {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
-  const { patientID, doctorID, patientInfo, status, peers } = req.body;
+  const { patientID, doctorID, patientInfo /* now plain text */, status, peers } = req.body;
   if (!patientID || !doctorID || !patientInfo || !status) {
     return res.status(400).json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
   }
   try {
-    const message = await invoke.invokeTransaction(
+    // 1) First: perform the checkOut transaction
+    const checkOutResult = await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
       'checkOut',
-      [ patientID, doctorID, JSON.stringify(patientInfo), status ],
+      [ patientID, doctorID, patientInfo, status ],  // patientInfo is plain text now
       req.username,
       req.orgName,
-      peers    // ← now passing peers through
+      peers
     );
-    res.json({ success: true, result: message });
+
+    // 2) Then: sendMessage to the patient
+    const userRecord = await query.getUserByUsername(
+      req.username,  // searchUsername
+      req.username,  // wallet identity
+      req.orgName
+    );
+    const senderID = userRecord.uuid;
+    const sendMsgResult = await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'sendMessage',
+      [ senderID, patientID, patientInfo ],  // use the same text
+      req.username,
+      req.orgName,
+      peers
+    );
+
+    return res.json({
+      success: true,
+      checkOutResult,
+      sendMsgResult
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.name, errorData: error.message });
+    console.error('POST /checkOut error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

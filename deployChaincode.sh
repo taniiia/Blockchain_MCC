@@ -54,7 +54,7 @@ presetup() {
 
 CHANNEL_NAME="patient-medication-channel"
 CC_RUNTIME_LANGUAGE="golang"
-VERSION="4"
+VERSION="17"
 CC_SRC_PATH="./artifacts/src/github.com/medical_chaincode/chaincode"
 CC_NAME="mychaincode"
 
@@ -189,7 +189,6 @@ commitChaincodeDefinition() {
         --version ${VERSION} --sequence ${VERSION} --init-required
     echo "Chaincode committed"
 }
-
 #commitChaincodeDefinition
 
 queryCommitted() {
@@ -198,7 +197,7 @@ queryCommitted() {
 
 }
 
-queryCommitted
+#queryCommitted
 
 chaincodeInvokeInit() {
     setGlobalsForPeer0BLR

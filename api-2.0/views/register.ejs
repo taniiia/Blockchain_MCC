@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><title>Register</title></head>
+<body>
+  <h1>Register</h1>
+  <form action="/users" method="POST">
+    <label>Username:</label><br>
+    <input type="text" name="username" required><br><br>
+
+    <label>Password:</label><br>
+    <input type="password" name="password" required><br><br>
+
+    <label>Organization:</label><br>
+    <select name="orgName" required>
+      <option value="PESUHospitalBLR">PESUHospitalBLR</option>
+      <option value="PESUHospitalKPM">PESUHospitalKPM</option>
+    </select><br><br>
+
+    <label>Role:</label><br>
+    <select name="role" required>
+      <option value="pharmacist">Pharmacist</option>
+      <option value="receptionist">Receptionist</option>
+    </select><br><br>
+
+    <button type="submit">Register</button>
+  </form>
+  <p>Already have an account? <a href="/login">Login here</a></p>
+</body>
+</html>

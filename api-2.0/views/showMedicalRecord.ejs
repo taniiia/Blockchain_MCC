@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>Record <%= recordID %></title></head>
+<body>
+  <h1>Record Decrypted</h1>
+  <p><strong>Record ID:</strong> <%= recordID %></p>
+  <p><strong>Patient ID:</strong> <%= record.patientID %></p>
+  <p><strong>Doctor ID:</strong> <%= record.doctorID %></p>
+  <hr/>
+  <p><strong>Symptoms:</strong> <%= record.symptoms %></p>
+  <p><strong>Diagnosis:</strong> <%= record.diagnosis %></p>
+  <p><strong>Notes:</strong> <%= record.notes %></p>
+  <a href="/getMedicalRecord">Back to Records List</a>
+</body>
+</html>

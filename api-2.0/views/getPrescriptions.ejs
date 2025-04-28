@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>View Prescriptions</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body { font-family: sans-serif; padding: 1em; }
+    label, select, button { display: block; margin-top: .5em; }
+    select { width: 100%; padding: .5em; }
+    .error { color: red; }
+    .details { margin-top: 1em; }
+    .details li { margin-bottom: .25em; }
+  </style>
+</head>
+<body>
+  <h1>Prescriptions for <%= username %></h1>
+
+  <% if (error) { %>
+    <p class="error"><%= error %></p>
+  <% } %>
+
+  <form method="POST" action="/getPrescriptions">
+    <label for="prescID">Select Prescription:</label>
+    <select name="prescID" id="prescID" required>
+      <% if (prescriptions.length) { %>
+        <% prescriptions.forEach(id => { %>
+          <option value="<%= id %>"><%= id %></option>
+        <% }) %>
+      <% } else { %>
+        <option disabled>No prescriptions available</option>
+      <% } %>
+    </select>
+    <input type="hidden" name="pharmacistID" value="<%= pharmacistID %>">
+    <button type="submit">Fetch</button>
+  </form>
+
+  <% if (error) { %>
+    <p class="error"><%= error %></p>
+  <% } %>
+
+  <% if (result) { %>
+    <h2>Prescription</h2>
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <% Object.entries(result).forEach(([key, value]) => { %>
+        <tr>
+          <td><%= key %></td>
+          <td>
+            <% if (typeof value === 'object') { %>
+              <pre><%= JSON.stringify(value, null, 2) %></pre>
+            <% } else { %>
+              <%= value %>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Patient Check-In</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <h1>Patient Check-In</h1>
+  <form id="checkinForm">
+    <label>Patient:</label>
+    <select name="patientID" required>
+      <% patients.forEach(p => { %>
+        <option value="<%= p.uuid || p.UUID %>"><%= p.name %> (<%= p.uuid || p.UUID %>)</option>
+      <% }) %>
+    </select><br/><br/>
+
+    <label>Doctor:</label>
+    <select name="doctorID" required>
+      <% doctors.forEach(d => { %>
+        <option value="<%= d.uuid || d.UUID %>"><%= d.name %> (<%= d.uuid || d.UUID %>)</option>
+      <% }) %>
+    </select><br/><br/>
+
+    <label>Info (JSON):</label><br/>
+    <textarea name="patientInfo" rows="3" required></textarea><br/><br/>
+
+    <label>Status:</label>
+    <input type="text" name="status" required /><br/><br/>
+
+    <!-- hidden peers -->
+    <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+
+    <button type="submit">Check In</button>
+  </form>
+
+  <div id="message" style="margin-top:1em;color:green;"></div>
+
+  <script>
+    document.getElementById('checkinForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        patientID:   f.patientID.value,
+        doctorID:    f.doctorID.value,
+        patientInfo: f.patientInfo.value,
+        status:      f.status.value,
+        peers:       JSON.parse(f.peers.value)
+      };
+      const res = await fetch('/patientCheckIn', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const result = await res.json();
+      if (res.ok && result.result) {
+        document.getElementById('message').innerText = 'Checked-in.';
+      } else {
+        document.getElementById('message').innerText =
+          'Error: ' + (result.errorData || JSON.stringify(result));
+      }
+    });
+  </script>
+</body>
+</html>

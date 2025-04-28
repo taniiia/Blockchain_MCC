@@ -1,0 +1,58 @@
+{
+  "Tan@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$xAnypS4DBVKITwE/3R6AKenctxIkcPEs20c5ulrUT/jFPYxRAzHaC",
+    "role": "pharmacist"
+  },
+  "Tani@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$1W937cZfddQ3EDyg8mp8X.CvUACV/DF4/J7EKZ5t1YYkhZ42TfNzS",
+    "role": "pharmacist"
+  },
+  "T@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$uvHqbjrmn8M7yBBoL/DLw.LeftTBUy8nS8qeYcW3igXdps2LLk/Ym",
+    "role": "pharmacist"
+  },
+  "A@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$/peATj.I321ZkA0p9GzPFO5rEjN2QVZNL1z.nz8az.Cvc43HQcnSi",
+    "role": "receptionist"
+  },
+  "An@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$/OWFRNDkeygOIboyV7taS./.Hwr.bhwRmoWnCeL85L1NrbcdedIue",
+    "role": "receptionist"
+  },
+  "N@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$4X/rduIvegK3hPmbTTlx6O6talQztr7NVHGE1S6FbJiwsrC.nVGZC",
+    "role": "patient"
+  },
+  "I@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$kFIFcUyVUkFFwsKMi19P6edzWJzcug7p8qFmTVsN2T0SO2fwuDjjK",
+    "role": "doctor"
+  },
+  "luv@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$3q90zqDs.ZYzXmwiotqheOE5Vcgm1u1aME2eJvk5G/g9h6Zc64wCW",
+    "role": "receptionist"
+  },
+  "tania@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$kPW/lOQcoEEX9tlOPI8yVOUTUCA1DXBAJDzmLWEgXLoqT2YVJRZRi",
+    "role": "pharmacist"
+  },
+  "tania123@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$tQgLIWj.EMaQtmkbDcWWl.6xB6IWmBZv7SNrPn6aVRXH3IhN6K2pq",
+    "role": "receptionist"
+  },
+  "small@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$V8fd5NpJXqY.JoNYpxq7nOt8s3L/rb4GZnfZHUHkrwqesP64B7Wdu",
+    "role": "patient"
+  },
+  "Rudra@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$y2FHJrEXBJCT0nEhgAusLObmmkQqblKb48BqZRQ.MqKkkqtcuWyTu",
+    "role": "doctor"
+  },
+  "rudra@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$dbMNsxQpcKGslCkVn5zEbO/PtJhetPae01Flry.aFUlZfBjI6QIJ.",
+    "role": "doctor"
+  },
+  "rudra1@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$59d4fx4jixJn4QtzQDo2jOeDEGImSPbKCGrcffqlnfU7O8UiU.qrS",
+    "role": "doctor"
+  }
+}

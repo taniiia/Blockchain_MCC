@@ -11,11 +11,15 @@ const logger = log4js.getLogger('BasicNetwork');
 const bodyParser = require('body-parser');
 const http = require('http');
 const util = require('util');
-const express = require('express')
+const express = require('express');
 const { expressjwt: expressJWT } = require('express-jwt');
 const jwt = require('jsonwebtoken');
 const bearerToken = require('express-bearer-token');
 const cors = require('cors');
+const fs        = require('fs');
+const path      = require('path');
+const bcrypt    = require('bcryptjs');
+const cookieParser = require('cookie-parser');
 
 const constants = require('./config/constants.json');
 // const config = require('./config.js');
@@ -29,6 +33,11 @@ const mcc = require('./app/mcc');
 
 const app = express();
 
+app.set('view engine', 'ejs');
+app.set('views', __dirname + '/views'); // Set views folder
+
+app.use(express.static('public'));
+
 app.options('*', cors());
 app.use(cors());
 app.use(bodyParser.json());
@@ -40,47 +49,98 @@ app.use(express.urlencoded({ extended: true }));
 // Set the JWT secret for signing tokens.
 app.set('secret', 'thisismysecret');
 
+app.use(cookieParser());
+
 // Protect all endpoints except registration and login.
 app.use(expressJWT({
   secret: 'thisismysecret',
-  algorithms: ['HS256'] // required in v7+
+  algorithms: ['HS256'], // required in v7+
+  getToken: req => req.cookies && req.cookies.token
 }).unless({
   path: [
+    '/register',
     '/users',
     '/users/login',
     '/register',
     '/registerPatient',
-    '/registerDoctor'
+    '/registerDoctor',
+    '/login'
   ]
 }));
 
 app.use(bearerToken());
 
+// path to our simple JSON user store
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+
+// helper to read/write our simple store
+function readUsers() {
+  if (!fs.existsSync(USERS_FILE)) return {};
+  return JSON.parse(fs.readFileSync(USERS_FILE));
+}
+ 
+function writeUsers(data) {
+  const dir = path.dirname(USERS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2));
+}
+
+// app.use((req, res, next) => {
+//   logger.debug('New request for %s', req.originalUrl);
+//   // Allow unprotected paths.
+//   if (req.originalUrl.includes('/users') ||
+//       req.originalUrl.includes('/users/login') ||
+//       req.originalUrl.includes('/register') ||
+//       req.originalUrl.includes('/registerPatient') ||
+//       req.originalUrl.includes('/registerDoctor')) {
+//     return next();
+//   }
+//   const token = req.token;
+//   jwt.verify(token, app.get('secret'), (err, decoded) => {
+//     if (err) {
+//       return res.status(403).json({
+//         success: false,
+//         message: 'Failed to authenticate token. Include token from /users as Bearer.'
+//       });
+//     } else {
+//       req.username = decoded.username;
+//       req.orgname = decoded.orgName;
+//       logger.debug(util.format('Decoded JWT: username - %s, orgName - %s', decoded.username, decoded.orgName));
+//       return next();
+//     }
+//   });
+// });
+
+// ——— AUTHENTICATION MIDDLEWARE ———
 app.use((req, res, next) => {
   logger.debug('New request for %s', req.originalUrl);
-  // Allow unprotected paths.
-  if (req.originalUrl.includes('/users') ||
-      req.originalUrl.includes('/users/login') ||
-      req.originalUrl.includes('/register') ||
-      req.originalUrl.includes('/registerPatient') ||
-      req.originalUrl.includes('/registerDoctor')) {
+  const openPaths = [
+    '/register', '/login',
+    '/users', '/users/login',
+    '/registerPatient', '/registerDoctor'
+  ];
+  if (openPaths.some(p => req.originalUrl.startsWith(p))) {
     return next();
   }
-  const token = req.token;
+  // read JWT from cookie (or fallback to Authorization header)
+  const token = req.cookies.token || req.token;
+  if (!token) {
+    return res.redirect('/login');
+  }
   jwt.verify(token, app.get('secret'), (err, decoded) => {
     if (err) {
-      return res.status(403).json({
-        success: false,
-        message: 'Failed to authenticate token. Include token from /users as Bearer.'
-      });
-    } else {
-      req.username = decoded.username;
-      req.orgname = decoded.orgName;
-      logger.debug(util.format('Decoded JWT: username - %s, orgName - %s', decoded.username, decoded.orgName));
-      return next();
+      res.clearCookie('token');
+      return res.redirect('/login');
     }
+    // attach user info
+    req.username = decoded.username;
+    req.orgName  = decoded.orgName;
+    req.role     = decoded.role;
+    logger.debug(`Authenticated: ${req.username}@${req.orgName} as ${req.role}`);
+    next();
   });
 });
+
 
 // Start the server.
 const host = process.env.HOST || constants.host;
@@ -101,11 +161,21 @@ function getErrorMessage(field) {
 
 // Register pharmacists / receptionists.
 // Expects JSON: { username, orgName, role }
+
 app.post('/users', async (req, res) => {
-  const { username, orgName, role, peers } = req.body;
-  if (!username || !orgName || !role) {
-    return res.json(getErrorMessage('username, orgName, and role'));
+  const { username, orgName, role, password } = req.body;
+  if (!username || !orgName || !role || !password) {
+    return res.status(400).json(getErrorMessage('username, orgName, role and password'));
   }
+
+  // ---- store hashed password in our simple store ----
+  const users = readUsers();
+  const key   = `${username}@${orgName}`;
+  if (users[key]) {
+    return res.status(409).json({ success: false, message: 'User already registered' });
+  }
+  users[key] = { passwordHash: await bcrypt.hash(password, 10), role };
+  writeUsers(users);
 
   // Create JWT
   const token = jwt.sign({
@@ -115,36 +185,90 @@ app.post('/users', async (req, res) => {
     role
   }, app.get('secret'));
 
-  // Off-chain + on-chain registration
+  // Compute peers array based on organization
+  const computedPeers = orgName === 'PESUHospitalBLR'
+    ? ['peer0.blr.pesuhospital.com', 'peer1.blr.pesuhospital.com']
+    : ['peer0.kpm.pesuhospital.com', 'peer1.kpm.pesuhospital.com'];
+
+  // Off-chain (CA) registration
   let response = await helper.getRegisteredUser(username, orgName, true, role);
   logger.debug('Registered user %s for org %s: %j', username, orgName, response);
-  if (response && typeof response !== 'string') {
-    if (peers) {
-      await invoke.invokeTransaction(
-        'patient-medication-channel',
-        'mychaincode',
-        'registerUser',
-        [username, orgName, role],
-        username,
-        orgName,
-        null
-      );
-    }
-    // Attach JWT
-    response.token = token;
-    res.json(response);
+  if (typeof response !== 'string') {
+    // invoke chaincode to write the user on-chain (CouchDB)
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'registerUser',
+      [username, orgName, role],
+      username,
+      orgName,
+      computedPeers
+    );
+
+    // Set JWT as HttpOnly cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge:   24 * 60 * 60 * 1000
+    });
+
+    // Redirect to login
+    return res.redirect('/login');
   } else {
-    res.json({ success: false, message: response });
+    // CA registration failed
+    return res.status(500).json({ success: false, message: response });
+  }
+});
+
+
+
+// process login
+app.post('/users/login', async (req, res) => {
+  const { username, orgName, password } = req.body;
+  if (!username || !orgName || !password) {
+    return res.status(400).json(getErrorMessage('username, orgName, and password'));
+  }
+  const users = readUsers();
+  const key   = `${username}@${orgName}`;
+  const rec   = users[key];
+  if (!rec || !(await bcrypt.compare(password, rec.passwordHash))) {
+    return res.status(401).render('login', { error: 'Invalid credentials' });
+  }
+  // issue JWT + cookie
+  const token = jwt.sign({
+    exp: Math.floor(Date.now()/1000) + parseInt(constants.jwt_expiretime),
+    username, orgName, role: rec.role
+  }, app.get('secret'));
+  res.cookie('token', token, { httpOnly: true, sameSite: 'strict', maxAge: 86400000 });
+  // redirect based on role
+  switch (rec.role) {
+    case 'receptionist': return res.redirect('/dashboard/receptionist');
+    case 'doctor':       return res.redirect('/dashboard/doctor');
+    case 'patient':      return res.redirect('/dashboard/patient');
+    case 'pharmacist':   return res.redirect('/dashboard/pharmacist');
+    default:             return res.redirect('/login');
   }
 });
 
 // Register patient. Expects JSON: { username, age, orgName, gender }
+// Register Patient. Expects form fields: { username, age, orgName, gender, password }
 app.post('/registerPatient', async (req, res) => {
-  const { username, age, orgName, gender, peers } = req.body;
-  if (!username || !age || !orgName || !gender) {
-    return res.json(getErrorMessage('username, age, orgName, and gender'));
+  const { username, age, orgName, gender, password } = req.body;
+  if (!username || !age || !orgName || !gender || !password) {
+    return res.status(400).json(getErrorMessage('username, age, orgName, gender and password'));
   }
 
+  // ---- store hashed password in our simple store ----
+  const users = readUsers();
+  const key   = `${username}@${orgName}`;
+  if (users[key]) {
+    return res.status(409).json({ success: false, message: 'User already registered' });
+  }
+  users[key] = { passwordHash: await bcrypt.hash(password, 10), role: 'patient' };
+  writeUsers(users);
+
+  // Create JWT
   const token = jwt.sign({
     exp: Math.floor(Date.now() / 1000) + parseInt(constants.jwt_expiretime),
     username,
@@ -154,34 +278,59 @@ app.post('/registerPatient', async (req, res) => {
     gender
   }, app.get('secret'));
 
+  // call your MCC registration helper
   let response = await helper.getRegisteredPatient(username, orgName, age, gender, true);
+  logger.debug('Registered patient %s for org %s: %j', username, orgName, response);
   if (response && typeof response !== 'string') {
-    if (peers) {
-      await invoke.invokeTransaction(
-        'patient-medication-channel',
-        'mychaincode',
-        'registerPatient',
-        [username, age.toString(), orgName, gender],
-        username,
-        orgName,
-        null
-      );
-    }
-    response.token = token;
-    res.json(response);
+    // set the cookie so future calls send the JWT automatically
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge:   24 * 60 * 60 * 1000
+    });
+
+    // derive peers internally
+    const peers = orgName === 'PESUHospitalBLR'
+      ? ['peer0.blr.pesuhospital.com', 'peer1.blr.pesuhospital.com']
+      : ['peer0.kpm.pesuhospital.com', 'peer1.kpm.pesuhospital.com'];
+
+    // submit the on-chain registration
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'registerPatient',
+      [username, age.toString(), orgName, gender],
+      username,
+      orgName,
+      peers
+    );
+
+    // redirect to login (so the user can “log in” immediately)
+    return res.redirect('/login');
   } else {
-    res.json({ success: false, message: response });
+    return res.status(500).json({ success: false, message: response });
   }
 });
 
 
-// Register doctor. Expects JSON: { username, gender, specialisation, orgName }
+// Register Doctor. Expects form fields: { username, gender, specialisation, orgName, password }
 app.post('/registerDoctor', async (req, res) => {
-  const { username, gender, specialisation, orgName, peers } = req.body;
-  if (!username || !gender || !specialisation || !orgName) {
-    return res.json(getErrorMessage('username, gender, specialisation, orgName'));
+  const { username, gender, specialisation, orgName, password } = req.body;
+  if (!username || !gender || !specialisation || !orgName || !password) {
+    return res.status(400).json(getErrorMessage('username, gender, specialisation, orgName and password'));
   }
 
+  // ---- store hashed password in our simple store ----
+  const users = readUsers();
+  const key   = `${username}@${orgName}`;
+  if (users[key]) {
+    return res.status(409).json({ success: false, message: 'User already registered' });
+  }
+  users[key] = { passwordHash: await bcrypt.hash(password, 10), role: 'doctor' };
+  writeUsers(users);
+
+  // Create JWT
   const token = jwt.sign({
     exp: Math.floor(Date.now() / 1000) + parseInt(constants.jwt_expiretime),
     username,
@@ -191,67 +340,135 @@ app.post('/registerDoctor', async (req, res) => {
     specialisation
   }, app.get('secret'));
 
+  // call your MCC registration helper
   let response = await helper.getRegisteredDoctor(username, orgName, gender, specialisation, true);
+  logger.debug('Registered doctor %s for org %s: %j', username, orgName, response);
   if (response && typeof response !== 'string') {
-    if (peers) {
-      await invoke.invokeTransaction(
-        'patient-medication-channel',
-        'mychaincode',
-        'registerDoctor',
-        [username, gender, specialisation, orgName],
-        username,
-        orgName,
-        null
-      );
-    }
-    response.token = token;
-    res.json(response);
+    // set the cookie so future calls send the JWT automatically
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge:   24 * 60 * 60 * 1000
+    });
+
+    // derive peers internally
+    const peers = orgName === 'PESUHospitalBLR'
+      ? ['peer0.blr.pesuhospital.com', 'peer1.blr.pesuhospital.com']
+      : ['peer0.kpm.pesuhospital.com', 'peer1.kpm.pesuhospital.com'];
+
+    // submit the on-chain registration
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'registerDoctor',
+      [username, gender, specialisation, orgName],
+      username,
+      orgName,
+      peers
+    );
+
+    // redirect to login
+    return res.redirect('/login');
   } else {
-    res.json({ success: false, message: response });
+    return res.status(500).json({ success: false, message: response });
   }
 });
+
+app.get('/patientCheckIn', async (req, res) => {
+  if (req.role !== 'receptionist') {
+    return res.status(403).send('Forbidden');
+  }
+
+  const patients = await query.evaluateTransaction(
+    'patient-medication-channel', 'mychaincode', 'queryAllPatients', [], req.username, req.orgName
+  );
+  const doctors = await query.evaluateTransaction(
+    'patient-medication-channel', 'mychaincode', 'queryAllDoctors', [], req.username, req.orgName
+  );
+
+  const peers = req.orgName === 'PESUHospitalBLR'
+    ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+    : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+  res.render('patientCheckIn', { patients, doctors, peers });
+});
+
+
 // Patient check-in (Registration channel). Expects: { patientID, doctorID, patientInfo, status, peers }
 app.post('/patientCheckIn', async (req, res) => {
+  if (req.role !== 'receptionist') {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
   const { patientID, doctorID, patientInfo, status, peers } = req.body;
   if (!patientID || !doctorID || !patientInfo || !status) {
-    return res.json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
+    return res.status(400).json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
   }
   try {
     const start = Date.now();
     const message = await invoke.invokeTransaction(
-      "patient-medication-channel",
-      "mychaincode",
-      "patientCheckIn",
-      [patientID, doctorID, JSON.stringify(patientInfo), status],
+      'patient-medication-channel',
+      'mychaincode',
+      'patientCheckIn',
+      [ patientID, doctorID, JSON.stringify(patientInfo), status ],
       req.username,
-      req.orgname,
-      null
+      req.orgName,
+      peers       // ← now passing the peers from the form
     );
     res.json({ result: message, latency: Date.now() - start });
   } catch (error) {
-    res.json({ result: null, error: error.name, errorData: error.message });
+    res.status(500).json({ result: null, error: error.name, errorData: error.message });
   }
 });
 
+// ─── Render Check-Out form ───
+app.get('/checkOut', async (req, res) => {
+  if (req.role !== 'receptionist') {
+    return res.status(403).send('Forbidden');
+  }
+
+  // 1) Fetch patients & doctors
+  const patients = await query.evaluateTransaction(
+    'patient-medication-channel', 'mychaincode', 'queryAllPatients',
+    [], req.username, req.orgName
+  );
+  const doctors = await query.evaluateTransaction(
+    'patient-medication-channel', 'mychaincode', 'queryAllDoctors',
+    [], req.username, req.orgName
+  );
+
+  // 2) Build peers array
+  const peers = req.orgName === 'PESUHospitalBLR'
+    ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+    : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+  // 3) Render the EJS view
+  res.render('checkOut', { patients, doctors, peers });
+});
+
 // Check-out (Registration channel). Expects: { patientID, doctorID, patientInfo, status, peers }
+// Submission endpoint (protected)
 app.post('/checkOut', async (req, res) => {
+  if (req.role !== 'receptionist') {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
   const { patientID, doctorID, patientInfo, status, peers } = req.body;
   if (!patientID || !doctorID || !patientInfo || !status) {
-    return res.json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
+    return res.status(400).json(getErrorMessage('patientID, doctorID, patientInfo, and status'));
   }
   try {
     const message = await invoke.invokeTransaction(
-      "patient-medication-channel",
-      "mychaincode",
-      "checkOut",
-      [patientID, doctorID, JSON.stringify(patientInfo), status],
+      'patient-medication-channel',
+      'mychaincode',
+      'checkOut',
+      [ patientID, doctorID, JSON.stringify(patientInfo), status ],
       req.username,
-      req.orgname,
-      null
+      req.orgName,
+      peers    // ← now passing peers through
     );
-    res.json({ result: message });
+    res.json({ success: true, result: message });
   } catch (error) {
-    res.json({ result: null, error: error.name, errorData: error.message });
+    res.status(500).json({ success: false, error: error.name, errorData: error.message });
   }
 });
 
@@ -261,67 +478,89 @@ app.post('/checkOut', async (req, res) => {
 
 // Create Medical Record (doctor only).
 // Expects: { patientID, doctorID, symptoms, diagnosis, notes, peers, doctorPrivateKey, patientPublicKey }
-app.post('/createMedicalRecord', async (req, res) => {
-  const {
-    patientID,
-    doctorID,
-    symptoms,
-    diagnosis,
-    notes,
-    peers,
-    doctorEncryptionPrivateKey,  // X25519 private key (Base64)
-    doctorEncryptionPublicKey,    // X25519 public  key (Base64)
-    patientEncryptionPublicKey   // X25519 public  key (Base64)
-  } = req.body;
-
-  // 1) Validate inputs
-  if (
-    !patientID || !doctorID || !symptoms || !diagnosis || !notes ||
-    !doctorEncryptionPrivateKey || !doctorEncryptionPublicKey || !patientEncryptionPublicKey
-  ) {
-    return res.status(400).json(
-      getErrorMessage(
-        'patientID, doctorID, symptoms, diagnosis, notes, doctorEncryptionPrivateKey, doctorEncryptionPublicKey, and patientEncryptionPublicKey'
-      )
-    );
+// ─── GET /createMedicalRecord ───
+app.get('/createMedicalRecord', async (req, res) => {
+  if (req.role !== 'doctor') {
+    return res.status(403).send('Forbidden');
   }
-
   try {
-    // 2) Derive shared secret
-    const docPrivKey = mcc.decodeKey(doctorEncryptionPrivateKey);
-    const patPubKey  = mcc.decodeKey(patientEncryptionPublicKey);
-    const sharedSecret = mcc.generateSharedSecret(docPrivKey, patPubKey);
+    // 1) fetch lists
+    const patients = await query.queryAllPatients(req.username, req.orgName);
+    const doctors  = await query.queryAllDoctors (req.username, req.orgName);
 
-    // 3) Encrypt the record
-    const record = { patientID, doctorID, symptoms, diagnosis, notes };
-    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(record), sharedSecret);
-
-    // 4) Package payload (use public key for sender)
-    const payload = {
-      ciphertext,
-      nonce,
-      senderPublicKey: doctorEncryptionPublicKey
-    };
-
-    // 5) Submit to ledger
-    const txResponse = await invoke.invokeTransaction(
-      'patient-medication-channel',
-      'mychaincode',
-      'createMedicalRecord',
-      [patientID, doctorID, JSON.stringify(payload)],
-      req.username,
-      req.orgname,
-      null
+    // 2) load *your* keys from disk
+    const keyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const { mccEncryptionPrivateKey, mccEncryptionPublicKey } = JSON.parse(
+      fs.readFileSync(keyFile)
     );
 
-    return res.json({ success: true, result: txResponse });
+    // 3) peers
+    const peers = req.orgName === 'PESUHospitalBLR'
+      ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+      : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
 
-  } catch (error) {
-    console.error('createMedicalRecord error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    res.render('createMedicalRecord', {
+      username: req.username,
+      patients,
+      doctors,
+      doctorEncryptionPrivateKey: mccEncryptionPrivateKey,
+      doctorEncryptionPublicKey:  mccEncryptionPublicKey,
+      peers
+    });
+  } catch (e) {
+    console.error('render createMedicalRecord error', e);
+    res.status(500).send('Unable to load form');
   }
 });
 
+// ─── POST /createMedicalRecord ───
+app.post('/createMedicalRecord', async (req, res) => {
+  if (req.role !== 'doctor') {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { patientID, doctorID, symptoms, diagnosis, notes, peers } = req.body;
+  if (!patientID || !doctorID || !symptoms || !diagnosis || !notes) {
+    return res.status(400).json(getErrorMessage(
+      'patientID, doctorID, symptoms, diagnosis, notes'
+    ));
+  }
+
+  try {
+    // 1) load keys from disk
+    const doctorKeyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const patientKeyFile= path.join(__dirname, 'mcc-keys', `${patientID.split(':')[1]}.json`);
+    const docKeys = JSON.parse(fs.readFileSync(doctorKeyFile));
+    const patKeys= JSON.parse(fs.readFileSync(patientKeyFile));
+
+    // 2) derive shared secret
+    const docPriv = mcc.decodeKey(docKeys.mccEncryptionPrivateKey);
+    const patPub  = mcc.decodeKey(patKeys.mccEncryptionPublicKey);
+    const shared  = mcc.generateSharedSecret(docPriv, patPub);
+
+    // 3) encrypt payload
+    const record = { patientID, doctorID, symptoms, diagnosis, notes };
+    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(record), shared);
+
+    // 4) build chaincode argument
+    const payload = JSON.stringify({ ciphertext, nonce, senderPublicKey: docKeys.mccEncryptionPublicKey });
+
+    // 5) submit
+    const tx = await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'createMedicalRecord',
+      [ patientID, doctorID, payload ],
+      req.username,
+      req.orgName,
+      peers
+    );
+    res.json({ success: true, result: tx });
+  } catch (error) {
+    console.error('createMedicalRecord POST error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Get Medical Record (secured by MCC). Query parameters: { recordID, receiverID, mccAuthToken, peer, patientPrivateKey, doctorPublicKey }
 
@@ -422,205 +661,339 @@ app.post('/createMedicalRecord', async (req, res) => {
 // });
 
 // … after app.use(bearerToken()) + your JWT middleware …
+// GET → show the patient a dropdown of their recordIDs
+// GET → render dropdown of recordIDs
+app.get('/getMedicalRecord', async (req, res) => {
+  if (req.role !== 'patient') {
+    return res.status(403).send('Forbidden');
+  }
 
-app.post('/getMedicalRecord', async (req, res) => {
+  let records = [];
+  let loadError = null;
+
   try {
-    const {
-      recordID,
-      receiverID,
-      mccAuthToken,                // { publicKey, signature }
-      patientEncryptionPrivateKey, // X25519 private key (Base64)
-      doctorEncryptionPublicKey    // X25519 public key  (Base64)
-    } = req.body;
+    // 1) fetch your on-chain user record by login-name
+    const userRec = await query.getUserByUsername(
+      req.username,  // searchUsername
+      req.username,  // wallet identity
+      req.orgName
+    );
+    const patientID = userRec.uuid;  // e.g. "patient:small:..."
 
-    // 1) Validate inputs
-    if (
-      !recordID || !receiverID || !mccAuthToken ||
-      !patientEncryptionPrivateKey || !doctorEncryptionPublicKey
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing one of: recordID, receiverID, mccAuthToken, patientEncryptionPrivateKey, or doctorEncryptionPublicKey'
-      });
-    }
+    // 2) now fetch *private* records for that patientID
+    const rawKeys = await query.queryMedicalRecordsByPatient(
+      patientID,
+      req.username,
+      req.orgName
+    );
+    records = Array.isArray(rawKeys) ? rawKeys : [];
 
-    // 2) Verify MCC signature (Ed25519)
-    const { publicKey: requesterSigningPub, signature } = mccAuthToken;
+  } catch (err) {
+    console.error('GET /getMedicalRecord error:', err);
+    loadError = 'Could not load your record list. Try again later.';
+  }
+
+  res.render('getMedicalRecord', {
+    username: req.username,
+    records,      // now should be an array of medrec-keys
+    loadError,
+    result: null,
+    error: null
+  });
+});
+
+
+// POST → fetch + decrypt
+app.post('/getMedicalRecord', async (req, res) => {
+  if (req.role !== 'patient') {
+    return res.status(403).send('Forbidden');
+  }
+  const { recordID } = req.body;
+  // re-fetch list so dropdown still works
+  let records = [];
+  try {
+    records = await query.queryMedicalRecordsByPatient(req.username, req.orgName);
+    if (!Array.isArray(records)) records = [];
+  } catch(_) { /* ignore fetch error here */ }
+
+  try {
+    // load patient’s keys
+    const keyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const { mccEncryptionPrivateKey, mccSigningPrivateKey, mccSigningPublicKey } =
+      JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+
+    // sign challenge
     const challenge = `access_medical_record:${recordID}`;
-    if (!mcc.verifySignature(requesterSigningPub, challenge, signature)) {
-      return res.status(403).json({ success: false, message: 'Invalid MCC signature' });
-    }
+    const signature = mcc.signMessage(mccSigningPrivateKey, challenge);
+    const mccAuthToken = { publicKey: mccSigningPublicKey, signature };
 
-    // 3) Fetch the encrypted record from chaincode
-    const txResponse = await invoke.invokeTransaction(
+    // fetch encrypted record
+    const tx = await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
       'getMedicalRecord',
-      [recordID, receiverID, JSON.stringify(mccAuthToken)],
+      [ recordID, req.username, JSON.stringify(mccAuthToken) ],
       req.username,
-      req.orgname,
+      req.orgName,
       null
     );
-
-    // txResponse has { message, result }
-    const payload = txResponse.result;
-    const record = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    const raw = tx.result;
+    const record = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
     if (!record.encrypted) {
-      return res.status(500).json({ success: false, message: 'Malformed record: missing encrypted field' });
+      throw new Error('Malformed record: missing encrypted field');
     }
 
-    // 4) Derive shared secret and decrypt
+    // decrypt
     const sharedSecret = mcc.generateSharedSecret(
-      mcc.decodeKey(patientEncryptionPrivateKey),
-      mcc.decodeKey(doctorEncryptionPublicKey)
+      mcc.decodeKey(mccEncryptionPrivateKey),
+      mcc.decodeKey(record.encrypted.senderPublicKey)
     );
     const plaintext = mcc.decryptData(
       record.encrypted.ciphertext,
       record.encrypted.nonce,
       sharedSecret
     );
+    const result = JSON.parse(plaintext);
 
-    // 5) Return the clear record
-    return res.json({ success: true, result: JSON.parse(plaintext) });
-
-  } catch (err) {
-    console.error('getMedicalRecord error:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-
-// Create Prescription (doctor only).
-// Expects: { patientID, doctorID, medications (JSON string), billAmount, peers, doctorPrivateKey, pharmacistPublicKey }
-app.post('/createPrescription', async (req, res) => {
-  const {
-    patientID,
-    doctorID,
-    medications,
-    billAmount,
-    peers,
-    doctorEncryptionPrivateKey,  // X25519 private key (Base64)
-    doctorEncryptionPublicKey,
-    pharmacistEncryptionPublicKey // X25519 public  key (Base64)
-  } = req.body;
-
-  // 1) Validate inputs
-  if (
-    !patientID || !doctorID ||
-    !medications || billAmount == null ||
-    !doctorEncryptionPrivateKey || !doctorEncryptionPublicKey ||
-    !pharmacistEncryptionPublicKey
-  ) {
-    return res.status(400).json(getErrorMessage(
-      'patientID, doctorID, medications, billAmount, doctorEncryptionPrivateKey, doctorEncryptionPublicKey and pharmacistEncryptionPublicKey'
-    ));
-  }
-
-  try {
-    // 2) Derive shared secret (doctor ↔ pharmacist)
-    const sharedSecret = mcc.generateSharedSecret(
-      mcc.decodeKey(doctorEncryptionPrivateKey),
-      mcc.decodeKey(pharmacistEncryptionPublicKey)
-    );
-
-    // 3) Encrypt
-    const prescriptionData = { medications, billAmount };
-    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(prescriptionData), sharedSecret);
-
-    // 4) Package payload (use public key for sender)
-    const payload = {
-      ciphertext,
-      nonce,
-      senderPublicKey: doctorEncryptionPublicKey
-    };
-
-    const txResponse = await invoke.invokeTransaction(
-      'patient-medication-channel',
-      'mychaincode',
-      'createPrescription',
-      [patientID, doctorID, JSON.stringify(payload)],
-      req.username,
-      req.orgname,
-      peers || null
-    );
-
-    // 5) Return chaincode result
-    return res.json({ success: true, result: txResponse.result });
+    res.render('getMedicalRecord', {
+      username: req.username,
+      records,
+      result,
+      error: null
+    });
 
   } catch (err) {
-    console.error('createPrescription error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.name,
-      errorData: err.message
+    console.error('POST /getMedicalRecord error:', err);
+    res.render('getMedicalRecord', {
+      username: req.username,
+      records,
+      result:  null,
+      error:   err.message
     });
   }
 });
 
 
 // Get Prescription (secured with MCC). Query parameters: { prescriptionID, receiverID, mccAuthToken, peer, pharmacistPrivateKey, doctorPublicKey }
-app.post('/getPrescription', async (req, res) => {
+// ─── Render Create Prescription form ───────────────────────────────
+// ─── Render the form ───────────────────────────────────────────────
+app.get('/createPrescription', async (req, res) => {
+  if (req.role !== 'doctor') {
+    return res.status(403).send('Forbidden');
+  }
+  try {
+    const patients    = await query.queryAllPatients(req.username, req.orgName);
+    const pharmacists = await query.queryAllPharmacists(req.username, req.orgName);
+
+    // doctor’s own chaincode ID:
+    const me       = await query.getUserByUsername(req.username, req.username, req.orgName);
+    const doctorID = me.uuid;
+
+    const peers = req.orgName === 'PESUHospitalBLR'
+      ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+      : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+    res.render('createPrescription', {
+      username: req.username,
+      doctorID,
+      patients,
+      pharmacists,
+      peers
+    });
+  } catch (err) {
+    console.error('GET /createPrescription error:', err);
+    res.status(500).send('Unable to load form');
+  }
+});
+
+// POST submission
+app.post('/createPrescription', async (req, res) => {
   const {
-    prescriptionID,
-    receiverID,
-    mccAuthToken,                  // { publicKey, signature }
-    pharmacistEncryptionPrivateKey, // X25519 private key (Base64)
-    doctorEncryptionPublicKey       // X25519 public  key (Base64)
+    patientID,
+    doctorID,
+    pharmacistID,
+    medications,
+    billAmount,
+    status,
+    peers
   } = req.body;
 
-  // 1) Validate
-  if (
-    !prescriptionID || !receiverID ||
-    !mccAuthToken ||
-    !pharmacistEncryptionPrivateKey ||
-    !doctorEncryptionPublicKey
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: 'Missing one of: prescriptionID, receiverID, mccAuthToken, pharmacistEncryptionPrivateKey, or doctorEncryptionPublicKey'
-    });
+  if (!patientID || !doctorID || !pharmacistID ||
+      !medications || billAmount == null || !status) {
+    return res.status(400).send('Missing required fields');
   }
 
   try {
-    // 2) Verify MCC signature (Ed25519)
-    const { publicKey: signerPub, signature } = mccAuthToken;
-    const challenge = `access_prescription:${prescriptionID}`;
-    if (!mcc.verifySignature(signerPub, challenge, signature)) {
-      return res.status(403).json({ success: false, message: 'Invalid MCC signature' });
-    }
+    // 1) Load doctor’s box private key
+    const docKeys = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'mcc-keys', `${req.username}.json`), 'utf8')
+    );
+    const docPriv = mcc.decodeKey(docKeys.mccEncryptionPrivateKey);
 
-    // 3) Fetch encrypted payload
-    const txResponse = await invoke.invokeTransaction(
+    // 2) Load pharmacist’s public key
+    const phLogin = pharmacistID.split(':')[1];
+    const phKeys  = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'mcc-keys', `${phLogin}.json`), 'utf8')
+    );
+    const phPub = mcc.decodeKey(phKeys.mccEncryptionPublicKey);
+
+    // 3) Derive shared secret & encrypt
+    const shared = mcc.generateSharedSecret(docPriv, phPub);
+    const payloadData = {
+      patientID,
+      doctorID,
+      pharmacistID,
+      medications: medications.split(/\s*,\s*/),
+      billAmount:  parseFloat(billAmount),
+      status
+    };
+    const { ciphertext, nonce } = mcc.encryptData(JSON.stringify(payloadData), shared);
+
+    const encryptedPayload = JSON.stringify({
+      ciphertext,
+      nonce,
+      senderPublicKey: docKeys.mccEncryptionPublicKey
+    });
+
+    // 4) Call chaincode (4 args)
+    await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
-      'getPrescription',
-      [prescriptionID, receiverID, JSON.stringify(mccAuthToken)],
+      'createPrescription',
+      [ patientID, doctorID, pharmacistID, encryptedPayload ],
       req.username,
-      req.orgname,
-      null
+      req.orgName,
+      peers || null
     );
 
-    const payload = txResponse.result;
-    const prescription = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    if (!prescription.encrypted) {
-      return res.status(500).json({ success: false, message: 'Malformed record: missing encrypted field' });
-    }
-    // 4) Decrypt
-    const sharedSecret = mcc.generateSharedSecret(
-      mcc.decodeKey(pharmacistEncryptionPrivateKey),
-      mcc.decodeKey(doctorEncryptionPublicKey)
-    );
-    const plaintext = mcc.decryptData(prescription.encrypted.ciphertext, prescription.encrypted.nonce, sharedSecret);
-
-    // 5) Return
-    return res.json({ success: true, result: JSON.parse(plaintext) });
-
+    res.send('Prescription submitted successfully!');
   } catch (err) {
-    console.error('getPrescription error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error('POST /createPrescription error:', err);
+    res.status(500).send('Failed to submit prescription');
   }
 });
+
+// ─── GET /getPrescriptions ─────────────────────────────────────────
+app.get('/getPrescriptions', async (req, res) => {
+  if (req.role !== 'pharmacist') {
+    return res.status(403).send('Forbidden');
+  }
+
+  let prescriptions = [];
+  let loadError     = null;
+  let pharmacistID  = null;
+
+  try {
+    // 1) find your full on‐chain UUID
+    const me = await query.getUserByUsername(
+      req.username, req.username, req.orgName
+    );
+    pharmacistID = me.uuid;
+
+    // 2) list your private prescriptions
+    const rawKeys = await query.queryPrescriptionsByPharmacist(
+      pharmacistID, req.username, req.orgName
+    );
+    prescriptions = Array.isArray(rawKeys) ? rawKeys : [];
+
+  } catch (err) {
+    console.error('GET /getPrescriptions error:', err);
+    loadError = 'Could not load your prescriptions. Try again later.';
+  }
+
+  res.render('getPrescriptions', {
+    username : req.username,
+    pharmacistID,
+    prescriptions,
+    loadError,
+    result:   null,
+    error:    null
+  });
+});
+
+
+// ─── POST /getPrescriptions ────────────────────────────────────────
+app.post('/getPrescriptions', async (req, res) => {
+  if (req.role !== 'pharmacist') {
+    return res.status(403).send('Forbidden');
+  }
+
+  const { prescID, pharmacistID } = req.body;
+  if (!prescID || !pharmacistID) {
+    return res.status(400).send('Must select a prescription');
+  }
+
+  // re-fetch for dropdown
+  let prescriptions = [];
+  try {
+    const rawKeys = await query.queryPrescriptionsByPharmacist(
+      pharmacistID, req.username, req.orgName
+    );
+    prescriptions = Array.isArray(rawKeys) ? rawKeys : [];
+  } catch { /* ignore */ }
+
+  try {
+    // load pharmacist’s MCC keys
+    const keyFile = path.join(__dirname, 'mcc-keys', `${req.username}.json`);
+    const {
+      mccEncryptionPrivateKey,
+      mccSigningPrivateKey,
+      mccSigningPublicKey
+    } = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+
+    // sign short challenge
+    const challenge    = `access_prescription:${prescID}`;
+    const signature    = mcc.signMessage(mccSigningPrivateKey, challenge);
+    const mccAuthToken = { publicKey: mccSigningPublicKey, signature };
+
+    // fetch encrypted blob
+    const tx     = await invoke.invokeTransaction(
+      'patient-medication-channel','mychaincode','getPrescription',
+      [ prescID, pharmacistID, JSON.stringify(mccAuthToken) ],
+      req.username, req.orgName, null
+    );
+    const raw     = tx.result;
+    const payload = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+    if (!payload.encrypted) {
+      throw new Error('Malformed prescription: missing encrypted field');
+    }
+
+    // decrypt
+    const sharedSecret = mcc.generateSharedSecret(
+      mcc.decodeKey(mccEncryptionPrivateKey),
+      mcc.decodeKey(payload.encrypted.senderPublicKey)
+    );
+    const plaintext   = mcc.decryptData(
+      payload.encrypted.ciphertext,
+      payload.encrypted.nonce,
+      sharedSecret
+    );
+    const result = JSON.parse(plaintext);
+
+    // render everything in one shot
+    res.render('getPrescriptions', {
+      username : req.username,
+      pharmacistID,
+      prescriptions,
+      result,
+      error: null
+    });
+
+  } catch (err) {
+    console.error('POST /getPrescriptions error:', err);
+    res.render('getPrescriptions', {
+      username : req.username,
+      pharmacistID,
+      prescriptions,
+      result: null,
+      error:  err.message
+    });
+  }
+});
+
+
 
 app.post('/dispenseMedication', async (req, res) => {
   const {
@@ -764,76 +1137,93 @@ app.post('/billing', async (req, res) => {
 });
 
 // ----- Communication Channel Endpoints ----- //
-
-// Send Message (all roles allowed). Expects: { senderID, recipientID, message, peers }
-app.post('/sendMessage', async (req, res) => {
-  const { senderID, recipientID, message, peers } = req.body;
-  if (!senderID || !recipientID || !message) {
-    return res.status(400).json(getErrorMessage('senderID, recipientID, and message'));
-  }
+// in app.js
+// ─── Send Message Form ───────────────────────────────────────────────
+app.get('/sendMessage', async (req, res) => {
   try {
-    const txResponse = await invoke.invokeTransaction(
-      "patient-medication-channel",
-      "mychaincode",
-      "sendMessage",
-      [senderID, recipientID, message],
-      req.username,
-      req.orgname,
-      peers || null
-    );
-    return res.json({ success: true, result: txResponse.result });
-  } catch (error) {
-    console.error('sendMessage error:', error);
-    return res.status(500).json({ success: false, error: error.name, errorData: error.message });
+    const users = await query.queryAllUsers(req.username, req.orgName);
+    const peers = req.orgName === 'PESUHospitalBLR'
+      ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+      : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+    res.render('sendMessage', {
+      username: req.username,
+      orgName:  req.orgName,
+      users,
+      peers
+    });
+  } catch (err) {
+    console.error('sendMessage GET error:', err);
+    res.status(500).send('Failed to load Send Message page');
   }
 });
 
-
-// Get Messages (only sender can retrieve). Query: { senderID, peer }
-// Fetch all messages sent by a user
-app.post('/getMessages', async (req, res) => {
-  const {
-    recipientID,
-    peers    // optional array of endorsing peers
-  } = req.body;
-
-  // 1) Validate
-  if (!recipientID) {
-    return res.status(400).json({
-      success: false,
-      message: 'Missing required parameter: senderID'
-    });
+// ─── Send Message Submission ────────────────────────────────────────
+// ─── Send Message Submission ────────────────────────────────────────
+// ─── Send Message Submission ────────────────────────────────────────
+app.post('/sendMessage', async (req, res) => {
+  const { recipientID, message, peers } = req.body;
+  if (!recipientID || !message) {
+    return res.status(400).json({ success: false, message: 'recipientID and message required' });
   }
 
   try {
-    // 2) Invoke chaincode
-    const txResponse = await invoke.invokeTransaction(
+    // load your on‐chain record by login‐name, now queries "name"
+    const userRecord = await query.getUserByUsername(
+      req.username,   // searchUsername
+      req.username,   // wallet identity
+      req.orgName
+    );
+    // extract the actual chaincode UUID
+    const senderID = userRecord.uuid;
+
+    // invoke sendMessage(senderID, recipientID, message)
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'sendMessage',
+      [ senderID, recipientID, message ],
+      req.username,
+      req.orgName,
+      peers
+    );
+
+    return res.json({ success: true, message: 'Message sent!' });
+  } catch (err) {
+    console.error('sendMessage POST error:', err);
+    // if chaincode returns "User not found", you’ll now get the right one once chaincode is fixed
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── Get Messages Form ───────────────────────────────────────────────
+// ─── Get & Show Messages ─────────────────────────────────────────────
+app.get('/getMessages', async (req, res) => {
+  try {
+    const userRecord = await query.getUserByUsername(
+      req.username, req.username, req.orgName
+    );
+    const recipientID = userRecord.uuid;
+
+    const messages = await query.evaluateTransaction(
       'patient-medication-channel',
       'mychaincode',
       'getMessages',
       [recipientID],
       req.username,
-      req.orgname,
-      peers || null
+      req.orgName
     );
 
-    // 3) Return the result
-    return res.json({
-      success: true,
-      messages: txResponse.result
+    res.render('getMessages', {
+      username: req.username,
+      orgName:  req.orgName,
+      messages
     });
-
-  } catch (error) {
-    console.error('getMessages error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.name,
-      errorData: error.message
-    });
+  } catch (err) {
+    console.error('getMessages error:', err);
+    res.status(500).send('Failed to fetch messages: ' + err.message);
   }
 });
-
-
 // ----- Query Endpoint ----- //
 
 // Query Patients by Doctor. Query: { doctorID, peer }
@@ -934,6 +1324,33 @@ app.get('/users', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/register', (req, res) => {
+  res.render('register');
+});
+
+app.get('/registerPatient', (req, res) => {
+  res.render('registerPatient');
+});
+
+app.get('/registerDoctor', (req, res) => {
+  res.render('registerDoctor');
+});
+
+// Render the login page
+app.get('/login', (req, res) => {
+  res.render('login', { error: null });
+});
+
+
+// generic dashboard handler
+app.get('/dashboard/:role', (req, res) => {
+  if (req.role !== req.params.role) {
+    return res.status(403).send('Forbidden');
+  }
+  return res.render(`dashboard-${req.params.role}`, { username: req.username });
+});
+
 
 
 module.exports = app;

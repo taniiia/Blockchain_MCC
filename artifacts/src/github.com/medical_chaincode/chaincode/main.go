@@ -77,6 +77,7 @@ type Prescription struct {
 	PrescriptionID string   `json:"prescriptionId"`
 	PatientID      string   `json:"patientId"`
 	DoctorID       string   `json:"doctorId"`
+	PharmacistID   string   `json:"pharmacistId"`
 	Medications    []string `json:"medications"`
 	BillAmount     float64  `json:"billAmount"`
 	Status         string   `json:"status"` // e.g., "Pending", "Dispensed"
@@ -148,12 +149,278 @@ func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response 
 		return s.sendMessage(APIstub, args)
 	case "getMessages":
 		return s.getMessages(APIstub, args)
+	case "queryAllPatients":
+		return s.queryAllPatients(APIstub, args)
+	case "queryAllDoctors":
+		return s.queryAllDoctors(APIstub, args)
 	// Query function
 	case "queryPatientsByDoctor":
 		return s.queryPatientsByDoctor(APIstub, args)
+	case "queryAllUsers":
+		return s.queryAllUsers(APIstub, args)
+	case "getUserByUsername":
+		return s.getUserByUsername(APIstub, args)
+	case "queryMedicalRecordsByPatient":
+		return s.queryMedicalRecordsByPatient(APIstub, args)
+	case "queryRecordsByPatient":
+		return s.queryRecordsByPatient(APIstub, args)
+	case "queryAllPharmacists":
+		return s.queryAllPharmacists(APIstub, args)
+	case "queryPrescriptionsByPharmacist":
+		return s.queryPrescriptionsByPharmacist(APIstub, args)
 	default:
 		return shim.Error("Invalid Smart Contract function name.")
 	}
+}
+
+func (s *SmartContract) queryPrescriptionsByPharmacist(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 1 {
+		return shim.Error("Expecting 1 arg: pharmacistID")
+	}
+	pid := args[0]
+
+	// auth: caller CN must match pharmacist login
+	cert, err := cid.GetX509Certificate(APIstub)
+	if err != nil {
+		return shim.Error("cert error: " + err.Error())
+	}
+	cn := cert.Subject.CommonName
+	if cn != strings.Split(pid, ":")[1] {
+		return shim.Error("Unauthorized")
+	}
+
+	// couch query on private collection
+	q := fmt.Sprintf(`{"selector":{"pharmacistId":"%s"}}`, pid)
+	iter, err := APIstub.GetPrivateDataQueryResult("PrivatePrescriptions", q)
+	if err != nil {
+		return shim.Error("Query failed: " + err.Error())
+	}
+	defer iter.Close()
+
+	var ids []string
+	for iter.HasNext() {
+		kv, _ := iter.Next()
+		ids = append(ids, kv.Key)
+	}
+	out, _ := json.Marshal(ids)
+	return shim.Success(out)
+}
+
+// Query all pharmacists by role == "pharmacist"
+func (s *SmartContract) queryAllPharmacists(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 0 {
+		return shim.Error("Incorrect number of arguments. Expecting 0")
+	}
+	// CouchDB selector for role = pharmacist
+	query := `{"selector":{"role":"pharmacist"}}`
+	resultsIter, err := APIstub.GetQueryResult(query)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIter.Close()
+
+	var pharmacists []map[string]interface{}
+	for resultsIter.HasNext() {
+		kv, err := resultsIter.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		var obj map[string]interface{}
+		if err := json.Unmarshal(kv.Value, &obj); err != nil {
+			return shim.Error(err.Error())
+		}
+		pharmacists = append(pharmacists, obj)
+	}
+
+	payload, err := json.Marshal(pharmacists)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	return shim.Success(payload)
+}
+
+// Query all medical record IDs for the caller (patient or doctor)
+func (s *SmartContract) queryRecordsByPatient(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	// we ignore args; derive caller CN
+	cert, err := cid.GetX509Certificate(APIstub)
+	if err != nil {
+		return shim.Error("Failed to get client certificate: " + err.Error())
+	}
+	caller := cert.Subject.CommonName
+
+	// selector on patientID (you stored the full key in recordID)
+	query := fmt.Sprintf(`{"selector":{"patientID":"%s"}}`, caller)
+	iter, err := APIstub.GetQueryResult(query)
+	if err != nil {
+		return shim.Error("Query failed: " + err.Error())
+	}
+	defer iter.Close()
+
+	var ids []string
+	for iter.HasNext() {
+		kv, _ := iter.Next()
+		var rec map[string]interface{}
+		if err := json.Unmarshal(kv.Value, &rec); err != nil {
+			continue
+		}
+		if id, ok := rec["recordID"].(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	out, _ := json.Marshal(ids)
+	return shim.Success(out)
+}
+
+// List all private-medrec IDs for a given patientID
+func (s *SmartContract) queryMedicalRecordsByPatient(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 1 {
+		return shim.Error("Expecting patientID")
+	}
+	pid := args[0]
+	// you used PrivateMedicalRecords collection
+	// use GetPrivateDataByPartialCompositeKey or a couch query; assuming couch:
+	q := fmt.Sprintf(`{"selector":{"patientID":"%s"}}`, pid)
+	it, err := APIstub.GetPrivateDataQueryResult("PrivateMedicalRecords", q)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer it.Close()
+	var ids []string
+	for it.HasNext() {
+		r, _ := it.Next()
+		ids = append(ids, r.Key)
+	}
+	out, _ := json.Marshal(ids)
+	return shim.Success(out)
+}
+
+func (s *SmartContract) getUserByUsername(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1")
+	}
+	loginName := args[0]
+	// query on the "name" field inside your stored JSON
+	queryString := fmt.Sprintf(`{"selector":{"name":"%s"}}`, loginName)
+
+	resultsIter, err := APIstub.GetQueryResult(queryString)
+	if err != nil {
+		return shim.Error("Query failed: " + err.Error())
+	}
+	defer resultsIter.Close()
+
+	for resultsIter.HasNext() {
+		kv, err := resultsIter.Next()
+		if err != nil {
+			return shim.Error("Iterator error: " + err.Error())
+		}
+		// this is the full JSON blob for your user
+		return shim.Success(kv.Value)
+	}
+	return shim.Error("User not found")
+}
+
+func (s *SmartContract) queryAllPatients(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	// No args expected
+	if len(args) != 0 {
+		return shim.Error("Incorrect number of arguments. Expecting 0")
+	}
+
+	resultsIterator, err := APIstub.GetStateByRange("", "")
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIterator.Close()
+
+	var patients []map[string]interface{}
+	for resultsIterator.HasNext() {
+		res, err := resultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		key := res.Key
+		if strings.HasPrefix(key, "patient:") {
+			var obj map[string]interface{}
+			if err := json.Unmarshal(res.Value, &obj); err != nil {
+				return shim.Error(err.Error())
+			}
+			patients = append(patients, obj)
+		}
+	}
+
+	payload, err := json.Marshal(patients)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	return shim.Success(payload)
+}
+
+// Query all doctors by prefix "doctor:"
+func (s *SmartContract) queryAllDoctors(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 0 {
+		return shim.Error("Incorrect number of arguments. Expecting 0")
+	}
+
+	resultsIterator, err := APIstub.GetStateByRange("", "")
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIterator.Close()
+
+	var doctors []map[string]interface{}
+	for resultsIterator.HasNext() {
+		res, err := resultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		key := res.Key
+		if strings.HasPrefix(key, "doctor:") {
+			var obj map[string]interface{}
+			if err := json.Unmarshal(res.Value, &obj); err != nil {
+				return shim.Error(err.Error())
+			}
+			doctors = append(doctors, obj)
+		}
+	}
+
+	payload, err := json.Marshal(doctors)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	return shim.Success(payload)
+}
+
+func (s *SmartContract) queryAllUsers(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 0 {
+		return shim.Error("Expecting 0 args")
+	}
+	iter, err := APIstub.GetStateByRange("", "")
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer iter.Close()
+
+	var all []map[string]interface{}
+	for iter.HasNext() {
+		kv, err := iter.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		key := kv.Key
+		// only user records: prefix "user:", "patient:", "doctor:", "pharmacist:", "receptionist:"
+		if strings.HasPrefix(key, "user:") ||
+			strings.HasPrefix(key, "patient:") ||
+			strings.HasPrefix(key, "doctor:") ||
+			strings.HasPrefix(key, "pharmacist:") ||
+			strings.HasPrefix(key, "receptionist:") {
+			var obj map[string]interface{}
+			if err := json.Unmarshal(kv.Value, &obj); err != nil {
+				return shim.Error(err.Error())
+			}
+			all = append(all, obj)
+		}
+	}
+	out, _ := json.Marshal(all)
+	return shim.Success(out)
 }
 
 // initLedger initializes the ledger with some predefined users.
@@ -352,13 +619,12 @@ func (s *SmartContract) checkOut(APIstub shim.ChaincodeStubInterface, args []str
 // ---------- Patient-Medication Channel Methods ---------- //
 
 func (s *SmartContract) createMedicalRecord(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	
+
 	clientID, err := cid.New(APIstub)
 	if err != nil {
 		return shim.Error("Failed to get client identity: " + err.Error())
 	}
 
-	
 	role, found, err := clientID.GetAttributeValue("role")
 	if err != nil {
 		return shim.Error("Error reading attribute 'role': " + err.Error())
@@ -367,7 +633,6 @@ func (s *SmartContract) createMedicalRecord(APIstub shim.ChaincodeStubInterface,
 		return shim.Error("Unauthorized: Only users with the 'doctor' role can create medical records")
 	}
 
-	
 	if len(args) != 3 {
 		return shim.Error("Incorrect number of arguments. Expecting 3: patientID, doctorID, encryptedPayload")
 	}
@@ -389,7 +654,6 @@ func (s *SmartContract) createMedicalRecord(APIstub shim.ChaincodeStubInterface,
 		return shim.Error("Failed to marshal record: " + err.Error())
 	}
 
-	
 	err = APIstub.PutPrivateData("PrivateMedicalRecords", recordID, recJSON)
 	if err != nil {
 		return shim.Error("Failed to store medical record: " + err.Error())
@@ -404,13 +668,11 @@ func (s *SmartContract) getMedicalRecord(APIstub shim.ChaincodeStubInterface, ar
 		return shim.Error("Incorrect number of arguments. Expecting 3")
 	}
 
-	
 	clientID, err := cid.New(APIstub)
 	if err != nil {
 		return shim.Error("Failed to get client identity: " + err.Error())
 	}
 
-	
 	role, found, err := clientID.GetAttributeValue("role")
 	if err != nil {
 		return shim.Error("Error reading attribute 'role': " + err.Error())
@@ -419,7 +681,6 @@ func (s *SmartContract) getMedicalRecord(APIstub shim.ChaincodeStubInterface, ar
 		return shim.Error("Unauthorized: Only users with 'patient' role can retrieve medical records")
 	}
 
-	
 	recJSON, err := APIstub.GetPrivateData("PrivateMedicalRecords", args[0])
 	if err != nil {
 		return shim.Error("Failed to read medical record: " + err.Error())
@@ -451,81 +712,93 @@ func (s *SmartContract) updateMedicalRecord(APIstub shim.ChaincodeStubInterface,
 	return shim.Success(updatedJSON)
 }
 
+// createPrescription stores a plain Prescription into the PrivatePrescriptions collection.
 func (s *SmartContract) createPrescription(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	
-	if len(args) != 3 {
-		return shim.Error("Incorrect number of arguments. Expecting 3: patientID, doctorID, encryptedPayload")
+	// args: [ patientID, doctorID, pharmacistID, encryptedPayloadJSON ]
+	if len(args) != 4 {
+		return shim.Error("Expecting 4 args: patientID, doctorID, pharmacistID, encryptedPayload")
 	}
 
-	
-	clientID, err := cid.New(APIstub)
+	// only doctors may call
+	cidObj, err := cid.New(APIstub)
 	if err != nil {
-		return shim.Error("Failed to get client identity: " + err.Error())
+		return shim.Error("Failed to get identity: " + err.Error())
 	}
-
-	
-	role, found, err := clientID.GetAttributeValue("role")
+	role, found, err := cidObj.GetAttributeValue("role")
 	if err != nil {
-		return shim.Error("Error reading 'role' attribute: " + err.Error())
+		return shim.Error("Error reading role: " + err.Error())
 	}
 	if !found || role != "doctor" {
-		return shim.Error("Unauthorized: Only users with the 'doctor' role can create prescriptions")
+		return shim.Error("Unauthorized: only doctors")
 	}
 
-	
-	prescriptionID := "presc:" + APIstub.GetTxID()
-
-	payloadWrapper := map[string]interface{}{
-		"prescriptionID": prescriptionID,
-		"patientID":      args[0],
-		"doctorID":       args[1],
-		"encrypted":      json.RawMessage(args[2]), // This will be a JSON object with ciphertext, nonce, etc.
+	// build the record wrapper
+	presc := struct {
+		PrescriptionID string          `json:"prescriptionId"`
+		PatientID      string          `json:"patientId"`
+		DoctorID       string          `json:"doctorId"`
+		PharmacistID   string          `json:"pharmacistId"`
+		Encrypted      json.RawMessage `json:"encrypted"`
+	}{
+		PrescriptionID: "presc:" + APIstub.GetTxID(),
+		PatientID:      args[0],
+		DoctorID:       args[1],
+		PharmacistID:   args[2],
+		Encrypted:      json.RawMessage(args[3]),
 	}
 
-	payloadBytes, err := json.Marshal(payloadWrapper)
+	data, err := json.Marshal(presc)
 	if err != nil {
-		return shim.Error("Failed to marshal prescription payload: " + err.Error())
+		return shim.Error("Marshal error: " + err.Error())
 	}
-
-	err = APIstub.PutPrivateData("PrivatePrescriptions", prescriptionID, payloadBytes)
-	if err != nil {
-		return shim.Error("Failed to store prescription: " + err.Error())
+	if err := APIstub.PutPrivateData("PrivatePrescriptions", presc.PrescriptionID, data); err != nil {
+		return shim.Error("PutPrivateData failed: " + err.Error())
 	}
-
-	return shim.Success(payloadBytes)
+	return shim.Success(data)
 }
 
 func (s *SmartContract) getPrescription(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	// Expects: [prescriptionID, receiverID, mccAuthToken]
+	// args: [ prescriptionID, pharmacistID, mccAuthTokenJSON ]
 	if len(args) != 3 {
-		return shim.Error("Incorrect number of arguments. Expecting 3: prescriptionID, receiverID, mccAuthToken")
+		return shim.Error("Incorrect number of arguments. Expecting 3: prescriptionID, pharmacistID, mccAuthToken")
 	}
 
-	
-	clientID, err := cid.New(APIstub)
+	// 1) Ensure caller has 'pharmacist' role
+	cidObj, err := cid.New(APIstub)
 	if err != nil {
 		return shim.Error("Failed to get client identity: " + err.Error())
 	}
-
-	role, found, err := clientID.GetAttributeValue("role")
+	role, found, err := cidObj.GetAttributeValue("role")
 	if err != nil {
-		return shim.Error("Error retrieving 'role' attribute: " + err.Error())
+		return shim.Error("Error reading 'role' attribute: " + err.Error())
 	}
 	if !found || role != "pharmacist" {
-		return shim.Error("Unauthorized: Only users with the 'pharmacist' role can access prescriptions")
+		return shim.Error("Unauthorized: Only pharmacists may retrieve prescriptions")
 	}
 
-	
-	prescriptionID := args[0]
-	prescJSON, err := APIstub.GetPrivateData("PrivatePrescriptions", prescriptionID)
+	// 2) Ensure caller's CN matches the pharmacistID passed in
+	cert, err := cid.GetX509Certificate(APIstub)
 	if err != nil {
-		return shim.Error("Failed to retrieve prescription: " + err.Error())
+		return shim.Error("Failed to get client certificate: " + err.Error())
 	}
-	if prescJSON == nil {
+	parts := strings.Split(args[1], ":")
+	if len(parts) < 2 || cert.Subject.CommonName != parts[1] {
+		return shim.Error("Unauthorized: pharmacist mismatch")
+	}
+
+	// 3) (optional) you could parse args[2] here and verify the MCC signature
+	//    but since you already did that off‐chain, we'll skip it
+
+	// 4) Fetch the encrypted prescription from the private collection
+	recBytes, err := APIstub.GetPrivateData("PrivatePrescriptions", args[0])
+	if err != nil {
+		return shim.Error("Fetch error: " + err.Error())
+	}
+	if recBytes == nil {
 		return shim.Error("Prescription not found")
 	}
 
-	return shim.Success(prescJSON)
+	return shim.Success(recBytes)
 }
 
 func (s *SmartContract) updatePrescription(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
@@ -622,76 +895,80 @@ func (s *SmartContract) billing(APIstub shim.ChaincodeStubInterface, args []stri
 // ---------- Communication Channel Methods ---------- //
 
 func (s *SmartContract) sendMessage(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	// Expects: [senderID, recipientID, message]
 	if len(args) != 3 {
-		return shim.Error("Incorrect number of arguments. Expecting 3")
+		return shim.Error("Incorrect number of arguments. Expecting 3: senderID, recipientID, message")
 	}
+	senderID := args[0]
+	recipientID := args[1]
+	msgText := args[2]
+
+	// build and store
+	txID := APIstub.GetTxID()
 	msg := Message{
-		ID:      "msg:" + args[0] + ":" + APIstub.GetTxID(),
-		FromID:  args[0],
-		ToID:    args[1],
-		Content: args[2],
+		ID:      fmt.Sprintf("msg:%s:%s", senderID, txID),
+		FromID:  senderID,
+		ToID:    recipientID,
+		Content: msgText,
 		Channel: "patient-medication-channel",
 	}
 	msgJSON, err := json.Marshal(msg)
 	if err != nil {
-		return shim.Error(err.Error())
+		return shim.Error("Failed to marshal message: " + err.Error())
 	}
-	APIstub.PutState(msg.ID, msgJSON)
+	if err := APIstub.PutState(msg.ID, msgJSON); err != nil {
+		return shim.Error("Failed to put message state: " + err.Error())
+	}
 	return shim.Success(msgJSON)
 }
 
+// ─── Get Messages ────────────────────────────────────────────────────────
+// Unchanged: still expects 1 arg [recipientID], validates caller by X.509 CN
 func (s *SmartContract) getMessages(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	// Expects exactly one argument: recipientID in format "user:<CommonName>:<hash>"
+	// Expects exactly one argument: the full state‐key, e.g. "user:An:txid…"
 	if len(args) != 1 {
 		return shim.Error("Incorrect number of arguments. Expecting 1: recipientID")
 	}
 
-	// Split out the CommonName from your passed-in recipientID
+	// 1) parse the CN out of that key
 	parts := strings.Split(args[0], ":")
 	if len(parts) < 2 {
-		return shim.Error("Invalid recipientID format, must be user:<CommonName>:<hash>")
+		return shim.Error("Invalid recipientID format, must be user:<CommonName>:<…>")
 	}
-	requestedCN := parts[1] // the enrollment CN you care about
+	requestedCN := parts[1]
 
-	// Retrieve the caller’s certificate and extract its CommonName
+	// 2) get caller’s CN
 	cert, err := cid.GetX509Certificate(APIstub)
 	if err != nil {
 		return shim.Error("Failed to get client certificate: " + err.Error())
 	}
 	callerCN := cert.Subject.CommonName
 
-	// Enforce that callers can only fetch their own messages
+	// 3) enforce that callers only fetch their own messages
 	if callerCN != requestedCN {
-		return shim.Error("Unauthorized: You can only query messages for yourself")
+		return shim.Error("Unauthorized: you can only fetch your own messages")
 	}
 
-	// Build a CouchDB selector to fetch messages where toId == full args[0]
-	query := fmt.Sprintf(`{"selector":{"toId":"%s"}}`, args[0])
-	resultsIter, err := APIstub.GetQueryResult(query)
+	// 4) pull from CouchDB by full key
+	selector := fmt.Sprintf(`{"selector":{"toId":"%s"}}`, args[0])
+	iter, err := APIstub.GetQueryResult(selector)
 	if err != nil {
 		return shim.Error("Query failed: " + err.Error())
 	}
-	defer resultsIter.Close()
+	defer iter.Close()
 
-	// Accumulate results into a JSON array
-	var buffer bytes.Buffer
-	buffer.WriteString("[")
+	var buf bytes.Buffer
+	buf.WriteString("[")
 	first := true
-	for resultsIter.HasNext() {
-		resp, err := resultsIter.Next()
-		if err != nil {
-			return shim.Error("Iterator error: " + err.Error())
-		}
+	for iter.HasNext() {
+		resp, _ := iter.Next()
 		if !first {
-			buffer.WriteString(",")
+			buf.WriteString(",")
 		}
-		buffer.Write(resp.Value)
+		buf.Write(resp.Value)
 		first = false
 	}
-	buffer.WriteString("]")
-
-	return shim.Success(buffer.Bytes())
+	buf.WriteString("]")
+	return shim.Success(buf.Bytes())
 }
 
 // ---------- Query Function ---------- //

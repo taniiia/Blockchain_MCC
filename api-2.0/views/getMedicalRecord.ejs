@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Medical Records</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body { font-family: sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; }
+    th { background: #f4f4f4; text-align: left; }
+    .error { color: red; }
+    .no-records { font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Medical Records for <%= username %></h1>
+
+  <% if (error) { %>
+    <p class="error"><%= error %></p>
+  <% } %>
+
+  <form method="POST" action="/getMedicalRecord">
+    <label for="recordID">Pick a record:</label><br/>
+    <select name="recordID" id="recordID" required>
+      <% if (records.length) { %>
+        <% records.forEach(id => { %>
+          <option value="<%= id %>"><%= id %></option>
+        <% }) %>
+      <% } else { %>
+        <option disabled class="no-records">No records available</option>
+      <% } %>
+    </select>
+    <button type="submit">Fetch</button>
+  </form>
+
+  <% if (result) { %>
+    <h2>Your Medical Record</h2>
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <% Object.entries(result).forEach(([key, value]) => { %>
+        <tr>
+          <td><%= key %></td>
+          <td>
+            <% if (typeof value === 'object') { %>
+              <pre><%= JSON.stringify(value, null, 2) %></pre>
+            <% } else { %>
+              <%= value %>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</body>
+</html>

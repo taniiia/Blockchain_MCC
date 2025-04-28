@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Send Message</title>
+</head>
+<body>
+  <h1>Send Message as <%= username %> (Org: <%= orgName %>)</h1>
+
+  <form action="/sendMessage" method="POST">
+    <label for="recipientID">Select Recipient:</label><br/>
+    <select name="recipientID" id="recipientID" required>
+      <% 
+        // only show users in your own org
+        users
+          .filter(u => u.organization === orgName)
+          .forEach(user => { 
+      %>
+        <option value="<%= user.uuid %>">
+          <%= user.name %> (<%= user.uuid %>)
+        </option>
+      <% }); %>
+    </select><br/><br/>
+
+    <label for="message">Message:</label><br/>
+    <textarea name="message" id="message" rows="4" cols="50" required></textarea><br/><br/>
+
+    <button type="submit">Send Message</button>
+  </form>
+
+  <a href="/getMessages">View Your Messages</a>
+</body>
+</html>

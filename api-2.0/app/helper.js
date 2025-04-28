@@ -68,6 +68,18 @@ const getAffiliation = async (org) => {
     }
 };
 
+const saveMccKeysToFile = (username, keys) => {
+    // Save to a folder one level above helper.js directory
+    const filePath = path.join(__dirname, '..', 'mcc-keys', `${username}.json`);
+    const dir = path.dirname(filePath);
+  
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  
+    fs.writeFileSync(filePath, JSON.stringify(keys, null, 2));
+};
+  
 // Enroll the admin for the given organization.
 const enrollAdmin = async (org, ccp) => {
     try {
@@ -205,14 +217,21 @@ const getRegisteredUser = async (username, userOrg, isJson, role) => {
     const boxKeys  = mcc.generateBoxKeyPair();
     const signKeys = mcc.generateSignKeyPair();
   if (isJson) {
-    return {
-      success: true,
-      message: `${username} enrolled Successfully`,
-      mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
-      mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
-      mccSigningPrivateKey:     mcc.encodeKey(signKeys.secretKey),
-      mccSigningPublicKey:      mcc.encodeKey(signKeys.publicKey)
-    };
+    const keys = {
+        mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
+        mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
+        mccSigningPrivateKey:    mcc.encodeKey(signKeys.secretKey),
+        mccSigningPublicKey:     mcc.encodeKey(signKeys.publicKey)
+      };
+      
+      // Save keys to file
+      saveMccKeysToFile(username, keys);
+      
+      return {
+        success: true,
+        message: `${username} enrolled Successfully`,
+        ...keys
+      };          
   }
   return x509Identity;
 };
@@ -287,16 +306,23 @@ const getRegisteredDoctor = async (username, userOrg, gender, specialisation, is
 
     const boxKeys  = mcc.generateBoxKeyPair();
     const signKeys = mcc.generateSignKeyPair();
-  if (isJson) {
-    return {
-      success: true,
-      message: `${username} enrolled Successfully`,
-      mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
-      mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
-      mccSigningPrivateKey:     mcc.encodeKey(signKeys.secretKey),
-      mccSigningPublicKey:      mcc.encodeKey(signKeys.publicKey)
-    };
-  }
+    if (isJson) {
+        const keys = {
+            mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
+            mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
+            mccSigningPrivateKey:    mcc.encodeKey(signKeys.secretKey),
+            mccSigningPublicKey:     mcc.encodeKey(signKeys.publicKey)
+          };
+          
+          // Save keys to file
+          saveMccKeysToFile(username, keys);
+          
+          return {
+            success: true,
+            message: `${username} enrolled Successfully`,
+            ...keys
+          };          
+    }
   return x509Identity;
 };
 
@@ -370,16 +396,23 @@ const getRegisteredPatient = async (username, userOrg, age, gender, isJson) => {
 
     const boxKeys  = mcc.generateBoxKeyPair();
     const signKeys = mcc.generateSignKeyPair();
-  if (isJson) {
-    return {
-      success: true,
-      message: `${username} enrolled Successfully`,
-      mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
-      mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
-      mccSigningPrivateKey:     mcc.encodeKey(signKeys.secretKey),
-      mccSigningPublicKey:      mcc.encodeKey(signKeys.publicKey)
-    };
-  }
+    if (isJson) {
+        const keys = {
+            mccEncryptionPrivateKey: mcc.encodeKey(boxKeys.secretKey),
+            mccEncryptionPublicKey:  mcc.encodeKey(boxKeys.publicKey),
+            mccSigningPrivateKey:    mcc.encodeKey(signKeys.secretKey),
+            mccSigningPublicKey:     mcc.encodeKey(signKeys.publicKey)
+          };
+          
+          // Save keys to file
+          saveMccKeysToFile(username, keys);
+          
+          return {
+            success: true,
+            message: `${username} enrolled Successfully`,
+            ...keys
+          };          
+    }
   return x509Identity;
 };
 

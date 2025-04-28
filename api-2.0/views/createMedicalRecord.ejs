@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Create Medical Record</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <h1>Create Record (Doctor: <%= username %>)</h1>
+  <form id="recordForm" method="POST" action="/createMedicalRecord">
+    <label>Patient:</label><br/>
+    <select name="patientID" required>
+      <% patients.forEach(p => { %>
+        <option value="<%= p.uuid %>">
+          <%= p.name %> — <%= p.uuid %>
+        </option>
+      <% }) %>
+    </select><br/><br/>
+
+    <label>Doctor:</label><br/>
+    <select name="doctorID" required>
+      <% doctors.forEach(d => { %>
+        <option value="<%= d.uuid %>">
+          <%= d.name %> — <%= d.uuid %>
+        </option>
+      <% }) %>
+    </select><br/><br/>
+
+    <label>Symptoms:</label><br/>
+    <textarea name="symptoms" rows="2" required></textarea><br/><br/>
+
+    <label>Diagnosis:</label><br/>
+    <textarea name="diagnosis" rows="2" required></textarea><br/><br/>
+
+    <label>Notes:</label><br/>
+    <textarea name="notes" rows="3" required></textarea><br/><br/>
+
+    <!-- hidden values -->
+    <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>'/>
+
+    <button type="submit">Submit Record</button>
+  </form>
+
+  <div id="status" style="margin-top:1em;color:green;"></div>
+
+  <script>
+    document.getElementById('recordForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        patientID: f.patientID.value,
+        doctorID:  f.doctorID.value,
+        symptoms:  f.symptoms.value,
+        diagnosis: f.diagnosis.value,
+        notes:     f.notes.value,
+        peers:     JSON.parse(f.peers.value)
+      };
+      const res = await fetch('/createMedicalRecord', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const json = await res.json();
+      if (json.success) {
+        document.getElementById('status').innerText = 'Record created successfully!';
+      } else {
+        document.getElementById('status').style.color = 'red';
+        document.getElementById('status').innerText = 
+          json.error || JSON.stringify(json);
+      }
+    });
+  </script>
+</body>
+</html>

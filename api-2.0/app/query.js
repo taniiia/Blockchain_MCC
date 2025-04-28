@@ -1,68 +1,162 @@
-const { Gateway, Wallets, } = require('fabric-network');
-const fs = require('fs');
-const path = require("path")
-const log4js = require('log4js');
-const logger = log4js.getLogger('BasicNetwork');
-const util = require('util') 
+'use strict';
 
+const { Gateway, Wallets } = require('fabric-network');
+const helper = require('./helper');
 
-const helper = require('./helper')
-const query = async (channelName, chaincodeName, args, fcn, username, org_name) => {
+/**
+ * Evaluate (query) a transaction against the ledger.
+ *
+ * @param {string} channelName   The channel to query
+ * @param {string} chaincodeName The chaincode to invoke
+ * @param {string} fcn           The function name in chaincode
+ * @param {string[]} args        Array of string arguments
+ * @param {string} username      The enrolled user in your wallet
+ * @param {string} orgName       The org MSP (e.g. 'PESUHospitalBLR')
+ * @returns {Promise<any>}       The parsed JSON result (or raw string)
+*/
+async function evaluateTransaction(channelName, chaincodeName, fcn, args, username, orgName) {
+  // 1) Load connection profile
+  const ccp = await helper.getCCP(orgName);
 
-    try {
+  // 2) Build (or re-use) a filesystem wallet for this org
+  const walletPath = await helper.getWalletPath(orgName);
+  const wallet     = await Wallets.newFileSystemWallet(walletPath);
 
-        // load the network configuration
-        // const ccpPath = path.resolve(__dirname, '..', 'config', 'connection-org1.json');
-        // const ccpJSON = fs.readFileSync(ccpPath, 'utf8')
-        const ccp = await helper.getCCP(org_name) //JSON.parse(ccpJSON);
+  // 3) Connect to gateway
+  const gateway = new Gateway();
+  await gateway.connect(ccp, {
+    wallet,
+    identity: username,
+    discovery: { enabled: true, asLocalhost: true }
+  });
 
-        // Create a new file system based wallet for managing identities.
-        const walletPath = await helper.getWalletPath(org_name) //.join(process.cwd(), 'wallet');
-        const wallet = await Wallets.newFileSystemWallet(walletPath);
-        console.log(`Wallet path: ${walletPath}`);
+  // 4) Grab the network & contract
+  const network  = await gateway.getNetwork(channelName);
+  const contract = network.getContract(chaincodeName);
 
-        // Check to see if we've already enrolled the user.
-        let identity = await wallet.get(username);
-        if (!identity) {
-            console.log(`An identity for the user ${username} does not exist in the wallet, so registering user`);
-            await helper.getRegisteredUser(username, org_name, true)
-            identity = await wallet.get(username);
-            console.log('Run the registerUser.js application before retrying');
-            return;
-        }
+  // 5) Evaluate the transaction
+  const resultBuffer = await contract.evaluateTransaction(fcn, ...args);
 
-        // Create a new gateway for connecting to our peer node.
-        const gateway = new Gateway();
-        await gateway.connect(ccp, {
-            wallet, identity: username, discovery: { enabled: true, asLocalhost: true }
-        });
+  // 6) Clean up
+  await gateway.disconnect();
 
-        // Get the network (channel) our contract is deployed to.
-        const network = await gateway.getNetwork(channelName);
-
-        // Get the contract from the network.
-        const contract = network.getContract(chaincodeName);
-        let result;
-
-        if (fcn == "queryCar" || fcn =="queryCarsByOwner" || fcn == 'getHistoryForAsset' || fcn=='restictedMethod') {
-            result = await contract.evaluateTransaction(fcn, args[0]);
-
-        } else if (fcn == "readPrivateCar" || fcn == "queryPrivateDataHash"
-        || fcn == "collectionCarPrivateDetails") {
-            result = await contract.evaluateTransaction(fcn, args[0], args[1]);
-            // return result
-
-        }
-        console.log(result)
-        console.log(`Transaction has been evaluated, result is: ${result.toString()}`);
-
-        result = JSON.parse(result.toString());
-        return result
-    } catch (error) {
-        console.error(`Failed to evaluate transaction: ${error}`);
-        return error.message
-
-    }
+  // 7) JSON-parse if possible, else return raw string
+  try {
+    return JSON.parse(resultBuffer.toString());
+  } catch {
+    return resultBuffer.toString();
+  }
 }
 
-exports.query = query
+/**
+ * Convenience wrapper: fetches all patients (chaincode fcn 'queryAllPatients').
+ */
+async function queryAllPatients(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryAllPatients',
+    [],           // no args
+    username,
+    orgName
+  );
+}
+
+/**
+ * Convenience wrapper: fetches all doctors (chaincode fcn 'queryAllDoctors').
+ */
+async function queryAllDoctors(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryAllDoctors',
+    [],
+    username,
+    orgName
+  );
+}
+
+/**
+ * Convenience wrapper: fetches all users (chaincode fcn 'queryAllUsers').
+ */
+async function queryAllUsers(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryAllUsers',
+    [],
+    username,
+    orgName
+  );
+}
+
+/**
+ * Convenience wrapper: fetches a user by username (chaincode fcn 'getUserByUsername').
+ * @param {string} searchUsername - the username to search for
+ */
+async function getUserByUsername(searchUsername, username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'getUserByUsername',
+    [searchUsername], // Pass the username you are searching for
+    username,
+    orgName
+  );
+}
+
+async function queryRecordsByPatient(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryRecordsByPatient',
+    [],
+    username,
+    orgName
+  );
+}
+
+async function queryMedicalRecordsByPatient(patientID, username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryMedicalRecordsByPatient',
+    [ patientID ],
+    username,
+    orgName
+  );
+}
+
+async function queryAllPharmacists(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryAllPharmacists',
+    [],           // no args
+    username,
+    orgName
+  );
+}
+
+async function queryPrescriptionsByPharmacist(pharmacistID, username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryPrescriptionsByPharmacist',
+    [ pharmacistID ],
+    username,
+    orgName
+  );
+}
+
+module.exports = {
+  evaluateTransaction,
+  queryAllPatients,
+  queryAllDoctors,
+  queryAllUsers,
+  queryRecordsByPatient,
+  getUserByUsername,
+  queryMedicalRecordsByPatient,
+  queryAllPharmacists,
+  queryPrescriptionsByPharmacist
+};

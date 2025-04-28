@@ -1,0 +1,26 @@
+<!-- views/getMessages.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Messages for <%= username %></title>
+</head>
+<body>
+  <h1>Messages for <%= username %> (org: <%= orgName %>)</h1>
+
+  <% if (!messages.length) { %>
+    <p>No messages found.</p>
+  <% } else { %>
+    <ul>
+      <% messages.forEach(m => { %>
+        <li>
+          <strong>From:</strong> <%= m.fromId %><br/>
+          <strong>Message:</strong> <%= m.content %>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+
+  <p><a href="/sendMessage">Send a New Message</a></p>
+</body>
+</html>

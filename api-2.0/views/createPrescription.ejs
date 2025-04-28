@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Prescription</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body { font-family: Arial, sans-serif; max-width:500px; margin:2em auto;
+           padding:2em; background:#f9f9f9; border-radius:8px;
+           box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h1 { text-align:center; margin-bottom:1.5em; }
+    form { display:flex; flex-direction:column; }
+    label { margin-top:1em; font-weight:bold; }
+    select, input[type="text"], input[type="number"] {
+      margin-top:0.5em; padding:0.6em; border:1px solid #ccc; border-radius:4px;
+    }
+    button {
+      margin-top:1.5em; padding:0.75em; background:#007bff; color:white;
+      border:none; border-radius:4px; cursor:pointer;
+    }
+    button:hover { background:#0056b3; }
+  </style>
+</head>
+<body>
+  <h1>Create Prescription as <%= username %></h1>
+
+  <form method="POST" action="/createPrescription">
+    <input type="hidden" name="doctorID" value="<%= doctorID %>"/>
+    <input type="hidden" name="peers"     value='<%= JSON.stringify(peers) %>'/>
+
+    <label for="patientID">Patient</label>
+    <select name="patientID" id="patientID" required>
+      <option value="" disabled selected>— select patient —</option>
+      <% patients.forEach(p => { %>
+        <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
+      <% }) %>
+    </select>
+
+    <label for="pharmacistID">Pharmacist</label>
+    <select name="pharmacistID" id="pharmacistID" required>
+      <option value="" disabled selected>— select pharmacist —</option>
+      <% pharmacists.forEach(ph => { %>
+        <option value="<%= ph.uuid %>"><%= ph.name %> (<%= ph.uuid %>)</option>
+      <% }) %>
+    </select>
+
+    <label for="medications">Medications (comma-separated)</label>
+    <input type="text"   name="medications" id="medications"
+           placeholder="e.g. Aspirin, Ibuprofen" required />
+
+    <label for="billAmount">Bill Amount</label>
+    <input type="number" name="billAmount" id="billAmount" step="0.01"
+           placeholder="e.g. 120.50" required />
+
+    <label for="status">Status</label>
+    <input type="text"   name="status" id="status"
+           placeholder="e.g. Pending" required />
+
+    <button type="submit">Submit Prescription</button>
+  </form>
+</body>
+</html>

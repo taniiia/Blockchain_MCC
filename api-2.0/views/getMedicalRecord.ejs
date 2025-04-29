@@ -5,52 +5,130 @@
   <title>Your Medical Records</title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    body { font-family: sans-serif; }
-    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
-    th, td { border: 1px solid #ccc; padding: 0.5em; }
-    th { background: #f4f4f4; text-align: left; }
-    .error { color: red; }
-    .no-records { font-style: italic; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: #333;
+      text-align: center;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1.5rem;
+    }
+    label {
+      font-weight: 500;
+      color: #555;
+      margin-top: 0.5rem;
+    }
+    select {
+      margin-top: 0.5rem;
+      padding: 0.6em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.75em;
+      font-size: 1em;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    button:hover {
+      background: #357ab8;
+      transform: translateY(-1px);
+    }
+    .error {
+      color: red;
+      text-align: center;
+    }
+    .table-container {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5em;
+      text-align: left;
+    }
+    th {
+      background: #f4f4f4;
+    }
+    pre {
+      margin: 0;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
   </style>
 </head>
 <body>
-  <h1>Medical Records for <%= username %></h1>
+  <div class="card">
+    <h1>Your Records</h1>
 
-  <% if (error) { %>
-    <p class="error"><%= error %></p>
-  <% } %>
+    <% if (error) { %>
+      <p class="error"><%= error %></p>
+    <% } %>
 
-  <form method="POST" action="/getMedicalRecord">
-    <label for="recordID">Pick a record:</label><br/>
-    <select name="recordID" id="recordID" required>
-      <% if (records.length) { %>
-        <% records.forEach(id => { %>
-          <option value="<%= id %>"><%= id %></option>
-        <% }) %>
-      <% } else { %>
-        <option disabled class="no-records">No records available</option>
-      <% } %>
-    </select>
-    <button type="submit">Fetch</button>
-  </form>
+    <form method="POST" action="/getMedicalRecord">
+      <label for="recordID">Pick a record</label>
+      <select name="recordID" id="recordID" required>
+        <% if (records.length) { %>
+          <% records.forEach(id => { %>
+            <option value="<%= id %>"><%= id %></option>
+          <% }) %>
+        <% } else { %>
+          <option disabled>No records available</option>
+        <% } %>
+      </select>
+      <button type="submit">Fetch</button>
+    </form>
 
-  <% if (result) { %>
-    <h2>Your Medical Record</h2>
-    <table>
-      <tr><th>Field</th><th>Value</th></tr>
-      <% Object.entries(result).forEach(([key, value]) => { %>
-        <tr>
-          <td><%= key %></td>
-          <td>
-            <% if (typeof value === 'object') { %>
-              <pre><%= JSON.stringify(value, null, 2) %></pre>
-            <% } else { %>
-              <%= value %>
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </table>
-  <% } %>
+    <% if (result) { %>
+      <div class="table-container">
+        <table>
+          <tr><th>Field</th><th>Value</th></tr>
+          <% Object.entries(result).forEach(([key, value]) => { %>
+            <tr>
+              <td><%= key %></td>
+              <td>
+                <% if (typeof value === 'object') { %>
+                  <pre><%= JSON.stringify(value, null, 2) %></pre>
+                <% } else { %>
+                  <%= value %>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </table>
+      </div>
+    <% } %>
+  </div>
 </body>
 </html>

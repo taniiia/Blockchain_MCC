@@ -1,26 +1,94 @@
-<!-- views/getMessages.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Messages for <%= username %></title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      margin: 2rem;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: #333;
+    }
+    .message-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .message-card {
+      background: #eaf3fc;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      text-align: left;
+      transition: transform 0.1s;
+    }
+    .message-card:hover {
+      transform: translateY(-2px);
+    }
+    .message-card strong {
+      color: #4a90e2;
+    }
+    .empty {
+      font-style: italic;
+      color: #666;
+    }
+    .actions {
+      margin-top: 1.5rem;
+    }
+    .actions a {
+      display: inline-block;
+      background: #4a90e2;
+      color: white;
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .actions a:hover {
+      background: #357ab8;
+    }
+  </style>
 </head>
 <body>
-  <h1>Messages for <%= username %> (org: <%= orgName %>)</h1>
+  <div class="container">
+    <h1>Messages for <%= username %></h1>
 
-  <% if (!messages.length) { %>
-    <p>No messages found.</p>
-  <% } else { %>
-    <ul>
-      <% messages.forEach(m => { %>
-        <li>
-          <strong>From:</strong> <%= m.fromId %><br/>
-          <strong>Message:</strong> <%= m.content %>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
+    <% if (!messages.length) { %>
+      <p class="empty">No messages found.</p>
+    <% } else { %>
+      <ul class="message-list">
+        <% messages.forEach(m => { %>
+          <li class="message-card">
+            <p><strong>From:</strong> <%= m.fromId %></p>
+            <p><strong>Message:</strong> <%= m.content %></p>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
 
-  <p><a href="/sendMessage">Send a New Message</a></p>
+    <div class="actions">
+      <a href="/sendMessage">Send a New Message</a>
+    </div>
+  </div>
 </body>
 </html>

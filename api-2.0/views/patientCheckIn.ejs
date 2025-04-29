@@ -1,39 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Patient Check-In</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      margin: 2rem;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: #333;
+    }
+    form {
+      text-align: left;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 1rem;
+    }
+    select, input[type="text"], textarea {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1.5rem;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #357ab8;
+    }
+    .message {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      color: green;
+    }
+    .error {
+      color: red;
+      margin-top: 1rem;
+    }
+  </style>
 </head>
 <body>
-  <h1>Patient Check-In</h1>
-  <form id="checkinForm">
-    <label>Patient:</label>
-    <select name="patientID" required>
-      <% patients.forEach(p => { %>
-        <option value="<%= p.uuid || p.UUID %>"><%= p.name %> (<%= p.uuid || p.UUID %>)</option>
-      <% }) %>
-    </select><br/><br/>
+  <div class="container">
+    <h1>Patient Check-In</h1>
 
-    <label>Doctor:</label>
-    <select name="doctorID" required>
-      <% doctors.forEach(d => { %>
-        <option value="<%= d.uuid || d.UUID %>"><%= d.name %> (<%= d.uuid || d.UUID %>)</option>
-      <% }) %>
-    </select><br/><br/>
+    <form id="checkinForm">
+      <label for="patientID">Patient</label>
+      <select name="patientID" id="patientID" required>
+        <% patients.forEach(p => { %>
+          <option value="<%= p.uuid || p.UUID %>">
+            <%= p.name %> — <%= p.uuid || p.UUID %>
+          </option>
+        <% }) %>
+      </select>
 
-    <label>Info (JSON):</label><br/>
-    <textarea name="patientInfo" rows="3" required></textarea><br/><br/>
+      <label for="doctorID">Doctor</label>
+      <select name="doctorID" id="doctorID" required>
+        <% doctors.forEach(d => { %>
+          <option value="<%= d.uuid || d.UUID %>">
+            <%= d.name %> — <%= d.uuid || d.UUID %>
+          </option>
+        <% }) %>
+      </select>
 
-    <label>Status:</label>
-    <input type="text" name="status" required /><br/><br/>
+      <label for="patientInfo">Info</label>
+      <textarea name="patientInfo" id="patientInfo" rows="3" required></textarea>
 
-    <!-- hidden peers -->
-    <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+      <label for="status">Status</label>
+      <input type="text" name="status" id="status" required />
 
-    <button type="submit">Check In</button>
-  </form>
+      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
 
-  <div id="message" style="margin-top:1em;color:green;"></div>
+      <button type="submit">Check In</button>
+    </form>
+
+    <div id="message" class="message"></div>
+  </div>
 
   <script>
     document.getElementById('checkinForm').addEventListener('submit', async e => {
@@ -53,11 +128,13 @@
         body: JSON.stringify(body)
       });
       const result = await res.json();
+      const msgEl = document.getElementById('message');
       if (res.ok && result.result) {
-        document.getElementById('message').innerText = 'Checked-in.';
+        msgEl.style.color = 'green';
+        msgEl.innerText = 'Checked-in successfully!';
       } else {
-        document.getElementById('message').innerText =
-          'Error: ' + (result.errorData || JSON.stringify(result));
+        msgEl.style.color = 'red';
+        msgEl.innerText = 'Error: ' + (result.errorData || JSON.stringify(result));
       }
     });
   </script>

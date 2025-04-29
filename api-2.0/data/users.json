@@ -54,5 +54,33 @@
   "rudra1@PESUHospitalBLR": {
     "passwordHash": "$2b$10$59d4fx4jixJn4QtzQDo2jOeDEGImSPbKCGrcffqlnfU7O8UiU.qrS",
     "role": "doctor"
+  },
+  "Tania@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$eeS5xUw7HUsWzcsaVlD5yelYTdJYxeIuB/t6IpMFTkhXOyFAgfTnC",
+    "role": "receptionist"
+  },
+  "F@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$b0vVE2fRNkOfwvtDQ29scO0IZ17HRkEqDJYng8tweU46o.GhwfN/q",
+    "role": "receptionist"
+  },
+  "P@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$QNn2XBS9AiIKU69B8DcqxuHGLrIyeVP8UJoTeifZ8qNQz61tfMhVu",
+    "role": "pharmacist"
+  },
+  "R@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$So8lQrscOWH/9oKMXYMmZePd4hYlEBqoDuKXtU3LFUMsBpndlq/8K",
+    "role": "receptionist"
+  },
+  "Pa@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$Bgfi6qeTzsHGZSkKNhNQqOEVypROvlsATBuzVDRWsXV3MJ57pTeAe",
+    "role": "patient"
+  },
+  "D@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$/D0Nhw8lLpi8DNqzsmifS.obIvj7BTJAPdGT2b55gbZMaAHsrUw9a",
+    "role": "doctor"
+  },
+  "Do@PESUHospitalBLR": {
+    "passwordHash": "$2b$10$M7EYCAikeQhNw0T.OR60mewzqlkfVGYyHrCsWJ5zZ4uEgHjPHCGFy",
+    "role": "doctor"
   }
 }

@@ -2,50 +2,133 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>View Prescriptions</title>
+  <title>Prescriptions for <%= username %></title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    body { font-family: sans-serif; padding: 1em; }
-    label, select, button { display: block; margin-top: .5em; }
-    select { width: 100%; padding: .5em; }
-    .error   { color: red; }
-    .details { margin-top: 1em; }
-    .details li { margin-bottom: .25em; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      margin: 2rem;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: #333;
+    }
+    form {
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 0.75rem;
+    }
+    select {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-top: 0.25rem;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #357ab8;
+    }
+    .error {
+      color: red;
+      margin-top: 1rem;
+    }
+    .card {
+      background: #eaf3fc;
+      border-radius: 6px;
+      padding: 1rem;
+      text-align: left;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      color: #333;
+    }
+    .card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0 0;
+    }
+    .card li {
+      margin-bottom: 0.5rem;
+    }
+    .card li strong {
+      color: #4a90e2;
+    }
   </style>
 </head>
 <body>
-  <h1>Prescriptions for <%= username %></h1>
+  <div class="container">
+    <h1>Prescriptions for <%= username %></h1>
 
-  <% if (error) { %>
-    <p class="error"><%= error %></p>
-  <% } %>
+    <% if (loadError) { %>
+      <p class="error"><%= loadError %></p>
+    <% } %>
 
-  <form method="POST" action="/getPrescriptions">
-    <label for="prescID">Select Prescription:</label>
-    <select name="prescID" id="prescID" required>
-      <% if (prescriptions.length) { %>
-        <% prescriptions.forEach(id => { %>
-          <option value="<%= id %>" <%= selected===id?'selected':'' %>><%= id %></option>
-        <% }) %>
-      <% } else { %>
-        <option disabled>No prescriptions available</option>
-      <% } %>
-    </select>
-    <input type="hidden" name="pharmacistID" value="<%= pharmacistID %>">
-    <button type="submit">Fetch</button>
-  </form>
+    <form method="POST" action="/getPrescriptions">
+      <label for="prescID">Select Prescription</label>
+      <select name="prescID" id="prescID" required>
+        <% if (prescriptions.length) { %>
+          <% prescriptions.forEach(id => { %>
+            <option value="<%= id %>" <%= selected===id?'selected':'' %>>
+              <%= id %>
+            </option>
+          <% }) %>
+        <% } else { %>
+          <option disabled>No prescriptions available</option>
+        <% } %>
+      </select>
+      <input type="hidden" name="pharmacistID" value="<%= pharmacistID %>">
+      <button type="submit">Fetch</button>
+    </form>
 
-  <% if (error) { %>
-    <p class="error"><%= error %></p>
-  <% } %>
+    <% if (error) { %>
+      <p class="error"><%= error %></p>
+    <% } %>
 
-  <% if (prescription) { %>
-    <h2>Decrypted Prescription</h2>
-    <ul class="details">
-      <li><strong>Medications:</strong>     <%= prescription.medications.join(', ') %></li>
-      <li><strong>Bill Amount:</strong>     ₹<%= prescription.billAmount %></li>
-      <li><strong>Status:</strong>          <%= prescription.status %></li>
-    </ul>
-  <% } %>
+    <% if (prescription) { %>
+      <div class="card">
+        <h2>Prescription Details</h2>
+        <ul>
+          <li><strong>Medications:</strong>   <%= prescription.medications.join(', ') %></li>
+          <li><strong>Bill Amount:</strong>   ₹<%= prescription.billAmount     %></li>
+          <li><strong>Status:</strong>        <%= prescription.status          %></li>
+        </ul>
+      </div>
+    <% } %>
+  </div>
 </body>
 </html>

@@ -1,47 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Create Medical Record</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    /* … your existing styles … */
+  </style>
 </head>
 <body>
-  <h1>Create Record (Doctor: <%= username %>)</h1>
-  <form id="recordForm" method="POST" action="/createMedicalRecord">
-    <label>Patient:</label><br/>
-    <select name="patientID" required>
-      <% patients.forEach(p => { %>
-        <option value="<%= p.uuid %>">
-          <%= p.name %> — <%= p.uuid %>
-        </option>
-      <% }) %>
-    </select><br/><br/>
+  <div class="card">
+    <h1>Create Record</h1>
+    <form id="recordForm">
+      <label for="patientID">Patient</label>
+      <select name="patientID" id="patientID" required>
+        <option value="" disabled selected>— select patient —</option>
+        <% patients.forEach(p => { %>
+          <!-- Removed the extra '%' after p.uuid -->
+          <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
+        <% }) %>
+      </select>
 
-    <label>Doctor:</label><br/>
-    <select name="doctorID" required>
-      <% doctors.forEach(d => { %>
-        <option value="<%= d.uuid %>">
-          <%= d.name %> — <%= d.uuid %>
-        </option>
-      <% }) %>
-    </select><br/><br/>
+      <label for="doctorID">Doctor</label>
+      <select name="doctorID" id="doctorID" required>
+        <option value="" disabled selected>— select doctor —</option>
+        <% doctors.forEach(d => { %>
+          <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
+        <% }) %>
+      </select>
 
-    <label>Symptoms:</label><br/>
-    <textarea name="symptoms" rows="2" required></textarea><br/><br/>
+      <label for="symptoms">Symptoms</label>
+      <textarea name="symptoms" id="symptoms" required placeholder="Describe symptoms…"></textarea>
 
-    <label>Diagnosis:</label><br/>
-    <textarea name="diagnosis" rows="2" required></textarea><br/><br/>
+      <label for="diagnosis">Diagnosis</label>
+      <textarea name="diagnosis" id="diagnosis" required placeholder="Enter diagnosis…"></textarea>
 
-    <label>Notes:</label><br/>
-    <textarea name="notes" rows="3" required></textarea><br/><br/>
+      <label for="notes">Notes</label>
+      <textarea name="notes" id="notes" required placeholder="Additional notes…"></textarea>
 
-    <!-- hidden values -->
-    <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>'/>
+      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
 
-    <button type="submit">Submit Record</button>
-  </form>
-
-  <div id="status" style="margin-top:1em;color:green;"></div>
+      <button type="submit">Submit Record</button>
+    </form>
+    <div id="status"></div>
+  </div>
 
   <script>
     document.getElementById('recordForm').addEventListener('submit', async e => {
@@ -55,19 +57,26 @@
         notes:     f.notes.value,
         peers:     JSON.parse(f.peers.value)
       };
-      const res = await fetch('/createMedicalRecord', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const json = await res.json();
-      if (json.success) {
-        document.getElementById('status').innerText = 'Record created successfully!';
-      } else {
-        document.getElementById('status').style.color = 'red';
-        document.getElementById('status').innerText = 
-          json.error || JSON.stringify(json);
+      try {
+        const res = await fetch('/createMedicalRecord', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+        const statusEl = document.getElementById('status');
+        if (json.success) {
+          statusEl.className = '';
+          statusEl.innerText = 'Record created successfully!';
+        } else {
+          statusEl.className = 'error';
+          statusEl.innerText = json.message || JSON.stringify(json);
+        }
+      } catch (err) {
+        const statusEl = document.getElementById('status');
+        statusEl.className = 'error';
+        statusEl.innerText = 'Error: ' + err.message;
       }
     });
   </script>

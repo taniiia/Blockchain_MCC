@@ -1,6 +1,63 @@
-<h1>Welcome <%= username %> (Pharmacist)</h1>
-<ul>
-  <li><a href="/getPrescriptions">Get Prescription</a></li>
-  <li><a href="/sendMessage">Send Message</a></li>
-  <li><a href="/getMessages">Get Messages</a></li>
-</ul>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pharmacist Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f7fa;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .dashboard {
+      background: white;
+      padding: 2rem 3rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 320px;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      color: #333;
+      font-size: 1.5rem;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li + li {
+      margin-top: 0.75rem;
+    }
+    a.button {
+      display: block;
+      text-decoration: none;
+      background: #4a90e2;
+      color: white;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-weight: bold;
+      transition: background 0.2s ease;
+    }
+    a.button:hover {
+      background: #357ab8;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <h1>Welcome <%= username %> (Pharmacist)</h1>
+    <ul>
+      <li><a href="/getPrescriptions" class="button">Get Prescription</a></li>
+      <li><a href="/sendMessage"       class="button">Send Message</a></li>
+      <li><a href="/getMessages"      class="button">Get Messages</a></li>
+    </ul>
+  </div>
+</body>
+</html>

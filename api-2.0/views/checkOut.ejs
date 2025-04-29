@@ -1,39 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Patient Check-Out</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+      font-size: 1.75rem;
+      color: #333;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    label {
+      margin-top: 1rem;
+      font-weight: 500;
+      color: #555;
+    }
+    select,
+    input[type="text"],
+    textarea {
+      margin-top: 0.5rem;
+      padding: 0.6em;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 0.75em;
+      font-size: 1em;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    button:hover {
+      background: #357ab8;
+      transform: translateY(-1px);
+    }
+    #message {
+      margin-top: 1em;
+      color: green;
+      text-align: center;
+    }
+    #message.error {
+      color: red;
+    }
+  </style>
 </head>
 <body>
-  <h1>Patient Check-Out</h1>
-  <form id="checkoutForm">
-    <label>Patient:</label>
-    <select name="patientID" required>
-      <% patients.forEach(p => { %>
-        <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
-      <% }); %>
-    </select><br/><br/>
+  <div class="card">
+    <h1>Patient Check-Out</h1>
+    <form id="checkoutForm">
+      <label for="patientID">Patient</label>
+      <select name="patientID" id="patientID" required>
+        <option value="" disabled selected>— select patient —</option>
+        <% patients.forEach(p => { %>
+          <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
+        <% }); %>
+      </select>
 
-    <label>Doctor:</label>
-    <select name="doctorID" required>
-      <% doctors.forEach(d => { %>
-        <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
-      <% }); %>
-    </select><br/><br/>
+      <label for="doctorID">Doctor</label>
+      <select name="doctorID" id="doctorID" required>
+        <option value="" disabled selected>— select doctor —</option>
+        <% doctors.forEach(d => { %>
+          <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
+        <% }); %>
+      </select>
 
-    <label>Message:</label><br/>
-    <textarea name="patientInfo" rows="3" placeholder="Type your message here…" required></textarea><br/><br/>
+      <label for="patientInfo">Message</label>
+      <textarea name="patientInfo" id="patientInfo" placeholder="Type your message here…" required></textarea>
 
-    <label>Status:</label>
-    <input type="text" name="status" required /><br/><br/>
+      <label for="status">Status</label>
+      <input type="text" name="status" id="status" placeholder="e.g. Discharged" required />
 
-    <!-- hidden peers array -->
-    <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
 
-    <button type="submit">Check Out</button>
-  </form>
-
-  <div id="message" style="margin-top:1em;color:green;"></div>
+      <button type="submit">Check Out</button>
+    </form>
+    <div id="message"></div>
+  </div>
 
   <script>
     document.getElementById('checkoutForm').addEventListener('submit', async e => {
@@ -42,23 +118,30 @@
       const body = {
         patientID:   f.patientID.value,
         doctorID:    f.doctorID.value,
-        patientInfo: f.patientInfo.value,  // now plain text
+        patientInfo: f.patientInfo.value,
         status:      f.status.value,
         peers:       JSON.parse(f.peers.value)
       };
-      const res = await fetch('/checkOut', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const result = await res.json();
-      if (res.ok && result.success) {
-        document.getElementById('message').innerText = 'Checked-out and message sent to patient.';
-      } else {
-        document.getElementById('message').style.color = 'red';
-        document.getElementById('message').innerText =
-          'Error: ' + (result.message || JSON.stringify(result));
+      try {
+        const res = await fetch('/checkOut', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const result = await res.json();
+        const msgDiv = document.getElementById('message');
+        if (res.ok && result.success) {
+          msgDiv.className = '';
+          msgDiv.innerText = 'Checked-out and message sent to patient.';
+        } else {
+          msgDiv.className = 'error';
+          msgDiv.innerText = 'Error: ' + (result.message || JSON.stringify(result));
+        }
+      } catch (err) {
+        const msgDiv = document.getElementById('message');
+        msgDiv.className = 'error';
+        msgDiv.innerText = 'Error: ' + err.message;
       }
     });
   </script>

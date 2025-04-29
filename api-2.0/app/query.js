@@ -71,6 +71,17 @@ async function queryPrescriptionsByPharmacist(pharmacistID, username, orgName) {
   );
 }
 
+async function queryAllUsers(username, orgName) {
+  return evaluateTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'queryAllUsers',    // must match your chaincode function name
+    [],                  // no args
+    username,
+    orgName
+  );
+}
+
 module.exports = {
   evaluateTransaction,
   queryAllPatients,
@@ -78,5 +89,6 @@ module.exports = {
   queryAllPharmacists,
   getUserByUsername,
   queryMedicalRecordsByPatient,
-  queryPrescriptionsByPharmacist
+  queryPrescriptionsByPharmacist,
+  queryAllUsers
 };

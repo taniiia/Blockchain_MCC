@@ -1,15 +1,73 @@
 <!DOCTYPE html>
-<html>
-<head><title>Record <%= recordID %></title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Record <%= recordID %></title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: left;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      color: #333;
+      text-align: center;
+    }
+    .details {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+    .details li {
+      margin-bottom: 0.75rem;
+    }
+    .details strong {
+      display: inline-block;
+      width: 100px;
+      color: #555;
+    }
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #4a90e2;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .back-link:hover {
+      color: #357ab8;
+    }
+  </style>
+</head>
 <body>
-  <h1>Record Decrypted</h1>
-  <p><strong>Record ID:</strong> <%= recordID %></p>
-  <p><strong>Patient ID:</strong> <%= record.patientID %></p>
-  <p><strong>Doctor ID:</strong> <%= record.doctorID %></p>
-  <hr/>
-  <p><strong>Symptoms:</strong> <%= record.symptoms %></p>
-  <p><strong>Diagnosis:</strong> <%= record.diagnosis %></p>
-  <p><strong>Notes:</strong> <%= record.notes %></p>
-  <a href="/getMedicalRecord">Back to Records List</a>
+  <div class="container">
+    <h1>Record Decrypted</h1>
+    <ul class="details">
+      <li><strong>Record ID:</strong> <%= recordID %></li>
+      <li><strong>Patient ID:</strong> <%= record.patientID %></li>
+      <li><strong>Doctor ID:</strong> <%= record.doctorID %></li>
+      <li><strong>Symptoms:</strong> <%= record.symptoms %></li>
+      <li><strong>Diagnosis:</strong> <%= record.diagnosis %></li>
+      <li><strong>Notes:</strong> <%= record.notes %></li>
+    </ul>
+    <a class="back-link" href="/getMedicalRecord">← Back to Records List</a>
+  </div>
 </body>
 </html>

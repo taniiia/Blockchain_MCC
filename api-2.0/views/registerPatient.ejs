@@ -6,19 +6,16 @@
   <link rel="stylesheet" href="/css/styles.css">
   <style>
     body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background: #f0f4f8;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: flex; justify-content: center; align-items: center;
       min-height: 100vh;
     }
-    .container {
+    .card {
       background: #fff;
       padding: 2rem;
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       width: 360px;
       text-align: center;
@@ -28,27 +25,29 @@
       font-size: 1.5rem;
       color: #333;
     }
+    .error {
+      color: #c00;
+      margin-bottom: 1rem;
+      font-weight: 500;
+      text-align: center;
+    }
     form {
-      text-align: left;
+      display: flex; flex-direction: column; text-align: left;
     }
     label {
-      display: block;
-      margin-top: 1rem;
-      font-weight: 600;
+      margin-top: 1rem; font-weight: 500; color: #555;
     }
     input[type="text"],
     input[type="password"],
     input[type="number"],
     select {
-      width: 100%;
-      padding: 0.5rem;
-      margin-top: 0.25rem;
+      margin-top: 0.5rem;
+      padding: 0.6em;
+      font-size: 1em;
       border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 1rem;
-      box-sizing: border-box;
+      border-radius: 4px;
+      width: 100%; box-sizing: border-box;
     }
-    /* hide spinners on number inputs */
     input[type=number] {
       appearance: textfield;
       -moz-appearance: textfield;
@@ -56,39 +55,44 @@
     }
     input[type=number]::-webkit-outer-spin-button,
     input[type=number]::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
+      -webkit-appearance: none; margin: 0;
     }
-    input[type="submit"] {
-      display: block;
-      width: 100%;
-      padding: 0.75rem;
-      margin-top: 1.5rem;
-      background: #4a90e2;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background 0.2s;
+    button {
+      margin-top: 1.5rem; padding: 0.75em; font-size: 1em;
+      background: #4a90e2; color: white; border: none;
+      border-radius: 6px; cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
     }
-    input[type="submit"]:hover {
-      background: #357ab8;
+    button:hover {
+      background: #357ab8; transform: translateY(-1px);
     }
+    .login-link {
+      margin-top: 1.2rem; font-size: 0.9rem; color: #666;
+      text-align: center;
+    }
+    .login-link a {
+      color: #4a90e2; text-decoration: none; font-weight: 500;
+    }
+    .login-link a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="card">
     <h2>Patient Registration</h2>
+
+    <% if (error) { %>
+      <p class="error"><%= error %></p>
+    <% } %>
+
     <form action="/registerPatient" method="post">
       <label for="username">Username</label>
-      <input type="text" id="username" name="username" placeholder="Username" required />
+      <input type="text" id="username" name="username" required />
 
       <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Password" required />
+      <input type="password" id="password" name="password" required />
 
       <label for="age">Age</label>
-      <input type="number" id="age" name="age" placeholder="Age" required />
+      <input type="number" id="age" name="age" required />
 
       <label for="orgName">Organization</label>
       <select id="orgName" name="orgName" required>
@@ -105,8 +109,12 @@
         <option value="other">Other</option>
       </select>
 
-      <input type="submit" value="Register Patient" />
+      <button type="submit">Register Patient</button>
     </form>
+
+    <p class="login-link">
+      Already have an account? <a href="/login">Login here</a>
+    </p>
   </div>
 </body>
 </html>

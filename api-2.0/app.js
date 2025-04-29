@@ -161,18 +161,25 @@ function getErrorMessage(field) {
 
 // Register pharmacists / receptionists.
 // Expects JSON: { username, orgName, role }
+app.get('/register', (req, res) => {
+  res.render('register', { error: null });
+});
 
 app.post('/users', async (req, res) => {
   const { username, orgName, role, password } = req.body;
   if (!username || !orgName || !role || !password) {
-    return res.status(400).json(getErrorMessage('username, orgName, role and password'));
+    return res.status(400).render('register', {
+      error: 'All fields are required'
+    });
   }
 
-  // ---- store hashed password in our simple store ----
   const users = readUsers();
   const key   = `${username}@${orgName}`;
   if (users[key]) {
-    return res.status(409).json({ success: false, message: 'User already registered' });
+    // Rather than return JSON, re-render the form with an error
+    return res.status(409).render('register', {
+      error: 'User already registered'
+    });
   }
   users[key] = { passwordHash: await bcrypt.hash(password, 10), role };
   writeUsers(users);
@@ -251,129 +258,142 @@ app.post('/users/login', async (req, res) => {
   }
 });
 
+// Render the patient‐registration form, with no error initially
+app.get('/registerPatient', (req, res) => {
+  res.render('registerPatient', { error: null });
+});
+
 // Register patient. Expects JSON: { username, age, orgName, gender }
 // Register Patient. Expects form fields: { username, age, orgName, gender, password }
 app.post('/registerPatient', async (req, res) => {
   const { username, age, orgName, gender, password } = req.body;
+
+  // 1) Validate
   if (!username || !age || !orgName || !gender || !password) {
-    return res.status(400).json(getErrorMessage('username, age, orgName, gender and password'));
+    return res.status(400).render('registerPatient', {
+      error: 'username, age, orgName, gender and password are all required'
+    });
   }
 
-  // ---- store hashed password in our simple store ----
+  // 2) Check for existing user
   const users = readUsers();
   const key   = `${username}@${orgName}`;
   if (users[key]) {
-    return res.status(409).json({ success: false, message: 'User already registered' });
+    return res.status(409).render('registerPatient', {
+      error: 'User already registered'
+    });
   }
+
+  // 3) Happy path: save off‐chain
   users[key] = { passwordHash: await bcrypt.hash(password, 10), role: 'patient' };
   writeUsers(users);
 
-  // Create JWT
+  // 4) Create the JWT & cookie
   const token = jwt.sign({
-    exp: Math.floor(Date.now() / 1000) + parseInt(constants.jwt_expiretime),
-    username,
-    orgName,
-    role: 'patient',
-    age,
-    gender
+    exp: Math.floor(Date.now() / 1000) + parseInt(constants.jwt_expiretime, 10),
+    username, orgName, role: 'patient', age, gender
   }, app.get('secret'));
 
-  // call your MCC registration helper
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge:   24 * 60 * 60 * 1000
+  });
+
+  // 5) On‐chain (CA + chaincode) registration
   let response = await helper.getRegisteredPatient(username, orgName, age, gender, true);
-  logger.debug('Registered patient %s for org %s: %j', username, orgName, response);
-  if (response && typeof response !== 'string') {
-    // set the cookie so future calls send the JWT automatically
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge:   24 * 60 * 60 * 1000
-    });
-
-    // derive peers internally
-    const peers = orgName === 'PESUHospitalBLR'
-      ? ['peer0.blr.pesuhospital.com', 'peer1.blr.pesuhospital.com']
-      : ['peer0.kpm.pesuhospital.com', 'peer1.kpm.pesuhospital.com'];
-
-    // submit the on-chain registration
-    await invoke.invokeTransaction(
-      'patient-medication-channel',
-      'mychaincode',
-      'registerPatient',
-      [username, age.toString(), orgName, gender],
-      username,
-      orgName,
-      peers
-    );
-
-    // redirect to login (so the user can “log in” immediately)
-    return res.redirect('/login');
-  } else {
-    return res.status(500).json({ success: false, message: response });
+  if (typeof response === 'string') {
+    // CA‐side error
+    return res.status(500).render('registerPatient', { error: response });
   }
+
+  // peers for invoke…
+  const peers = orgName === 'PESUHospitalBLR'
+    ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+    : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+  await invoke.invokeTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'registerPatient',
+    [ username, age.toString(), orgName, gender ],
+    username,
+    orgName,
+    peers
+  );
+
+  // 6) Success → immediately send them to login
+  return res.redirect('/login');
 });
 
+// Render the doctor‐registration form, with no error initially
+app.get('/registerDoctor', (req, res) => {
+  res.render('registerDoctor', { error: null });
+});
 
 // Register Doctor. Expects form fields: { username, gender, specialisation, orgName, password }
 app.post('/registerDoctor', async (req, res) => {
   const { username, gender, specialisation, orgName, password } = req.body;
+
+  // 1) Validation
   if (!username || !gender || !specialisation || !orgName || !password) {
-    return res.status(400).json(getErrorMessage('username, gender, specialisation, orgName and password'));
+    return res.status(400).render('registerDoctor', {
+      error: 'username, gender, specialisation, orgName and password are all required'
+    });
   }
 
-  // ---- store hashed password in our simple store ----
+  // 2) Off‐chain user store
   const users = readUsers();
   const key   = `${username}@${orgName}`;
   if (users[key]) {
-    return res.status(409).json({ success: false, message: 'User already registered' });
+    return res.status(409).render('registerDoctor', {
+      error: 'User already registered'
+    });
   }
   users[key] = { passwordHash: await bcrypt.hash(password, 10), role: 'doctor' };
   writeUsers(users);
 
-  // Create JWT
+  // 3) Create JWT cookie
   const token = jwt.sign({
-    exp: Math.floor(Date.now() / 1000) + parseInt(constants.jwt_expiretime),
+    exp: Math.floor(Date.now()/1000) + parseInt(constants.jwt_expiretime,10),
+    username, orgName, role: 'doctor', gender, specialisation
+  }, app.get('secret'));
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV==='production',
+    sameSite: 'strict',
+    maxAge:   24*60*60*1000
+  });
+
+  // 4) CA + on‐chain registration
+  let response = await helper.getRegisteredDoctor(
+    username, orgName, gender, specialisation, true
+  );
+  if (typeof response === 'string') {
+    // CA failure
+    return res.status(500).render('registerDoctor', { error: response });
+  }
+
+  // 5) peers array
+  const peers = orgName==='PESUHospitalBLR'
+    ? ['peer0.blr.pesuhospital.com','peer1.blr.pesuhospital.com']
+    : ['peer0.kpm.pesuhospital.com','peer1.kpm.pesuhospital.com'];
+
+  await invoke.invokeTransaction(
+    'patient-medication-channel',
+    'mychaincode',
+    'registerDoctor',
+    [ username, gender, specialisation, orgName ],
     username,
     orgName,
-    role: 'doctor',
-    gender,
-    specialisation
-  }, app.get('secret'));
+    peers
+  );
 
-  // call your MCC registration helper
-  let response = await helper.getRegisteredDoctor(username, orgName, gender, specialisation, true);
-  logger.debug('Registered doctor %s for org %s: %j', username, orgName, response);
-  if (response && typeof response !== 'string') {
-    // set the cookie so future calls send the JWT automatically
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge:   24 * 60 * 60 * 1000
-    });
-
-    // derive peers internally
-    const peers = orgName === 'PESUHospitalBLR'
-      ? ['peer0.blr.pesuhospital.com', 'peer1.blr.pesuhospital.com']
-      : ['peer0.kpm.pesuhospital.com', 'peer1.kpm.pesuhospital.com'];
-
-    // submit the on-chain registration
-    await invoke.invokeTransaction(
-      'patient-medication-channel',
-      'mychaincode',
-      'registerDoctor',
-      [username, gender, specialisation, orgName],
-      username,
-      orgName,
-      peers
-    );
-
-    // redirect to login
-    return res.redirect('/login');
-  } else {
-    return res.status(500).json({ success: false, message: response });
-  }
+  // 6) Success → back to login
+  return res.redirect('/login');
 });
+
 
 app.get('/patientCheckIn', async (req, res) => {
   if (req.role !== 'receptionist') {

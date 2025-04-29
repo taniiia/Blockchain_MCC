@@ -10,10 +10,17 @@
       padding: 0;
       background: #f0f4f8;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      /* display: flex;
+      justify-content: center;
+      align-items: flex-start; */
+      min-height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
+      align-items: center;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .container {
       background: white;
@@ -74,42 +81,44 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Patient Check-In</h1>
-
-    <form id="checkinForm">
-      <label for="patientID">Patient</label>
-      <select name="patientID" id="patientID" required>
-        <% patients.forEach(p => { %>
-          <option value="<%= p.uuid || p.UUID %>">
-            <%= p.name %> — <%= p.uuid || p.UUID %>
-          </option>
-        <% }) %>
-      </select>
-
-      <label for="doctorID">Doctor</label>
-      <select name="doctorID" id="doctorID" required>
-        <% doctors.forEach(d => { %>
-          <option value="<%= d.uuid || d.UUID %>">
-            <%= d.name %> — <%= d.uuid || d.UUID %>
-          </option>
-        <% }) %>
-      </select>
-
-      <label for="patientInfo">Info</label>
-      <textarea name="patientInfo" id="patientInfo" rows="3" required></textarea>
-
-      <label for="status">Status</label>
-      <input type="text" name="status" id="status" required />
-
-      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
-
-      <button type="submit">Check In</button>
-    </form>
-
-    <div id="message" class="message"></div>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="container">
+      <h1>Patient Check-In</h1>
+  
+      <form id="checkinForm">
+        <label for="patientID">Patient</label>
+        <select name="patientID" id="patientID" required>
+          <% patients.forEach(p => { %>
+            <option value="<%= p.uuid || p.UUID %>">
+              <%= p.name %> — <%= p.uuid || p.UUID %>
+            </option>
+          <% }) %>
+        </select>
+  
+        <label for="doctorID">Doctor</label>
+        <select name="doctorID" id="doctorID" required>
+          <% doctors.forEach(d => { %>
+            <option value="<%= d.uuid || d.UUID %>">
+              <%= d.name %> — <%= d.uuid || d.UUID %>
+            </option>
+          <% }) %>
+        </select>
+  
+        <label for="patientInfo">Info</label>
+        <textarea name="patientInfo" id="patientInfo" rows="3" required></textarea>
+  
+        <label for="status">Status</label>
+        <input type="text" name="status" id="status" required />
+  
+        <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+  
+        <button type="submit">Check In</button>
+      </form>
+  
+      <div id="message" class="message"></div>
+    </div>  
   </div>
-
   <script>
     document.getElementById('checkinForm').addEventListener('submit', async e => {
       e.preventDefault();
@@ -128,13 +137,13 @@
         body: JSON.stringify(body)
       });
       const result = await res.json();
-      const msgEl = document.getElementById('message');
-      if (res.ok && result.result) {
+      const msgEl  = document.getElementById('message');
+      if (res.ok && result.success) {
         msgEl.style.color = 'green';
-        msgEl.innerText = 'Checked-in successfully!';
+        msgEl.innerText = result.message;
       } else {
         msgEl.style.color = 'red';
-        msgEl.innerText = 'Error: ' + (result.errorData || JSON.stringify(result));
+        msgEl.innerText = 'Error: ' + result.message;
       }
     });
   </script>

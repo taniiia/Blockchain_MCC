@@ -5,46 +5,114 @@
   <title>Create Medical Record</title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    /* … your existing styles … */
+    .card-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
+    }
+    .card {
+      background: #fff;
+      margin: 2rem auto;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      max-width: 400px;
+    }
+    .card h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+    .card form {
+      display: flex;
+      flex-direction: column;
+    }
+    .card label {
+      margin-top: 1rem;
+      font-weight: 500;
+      color: #555;
+    }
+    .card select,
+    .card textarea {
+      margin-top: 0.5rem;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    .card textarea { min-height: 80px; }
+    .card button {
+      margin-top: 1.5rem;
+      padding: 0.75rem;
+      font-size: 1rem;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .card button:hover {
+      background: #357ab8;
+      transform: translateY(-1px);
+    }
+    #status {
+      margin-top: 1rem;
+      text-align: center;
+      font-weight: 500;
+    }
+    #status.error { color: #c00; }
+    #status.success { color: green; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Create Record</h1>
-    <form id="recordForm">
-      <label for="patientID">Patient</label>
-      <select name="patientID" id="patientID" required>
-        <option value="" disabled selected>— select patient —</option>
-        <% patients.forEach(p => { %>
-          <!-- Removed the extra '%' after p.uuid -->
-          <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
-        <% }) %>
-      </select>
-
-      <label for="doctorID">Doctor</label>
-      <select name="doctorID" id="doctorID" required>
-        <option value="" disabled selected>— select doctor —</option>
-        <% doctors.forEach(d => { %>
-          <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
-        <% }) %>
-      </select>
-
-      <label for="symptoms">Symptoms</label>
-      <textarea name="symptoms" id="symptoms" required placeholder="Describe symptoms…"></textarea>
-
-      <label for="diagnosis">Diagnosis</label>
-      <textarea name="diagnosis" id="diagnosis" required placeholder="Enter diagnosis…"></textarea>
-
-      <label for="notes">Notes</label>
-      <textarea name="notes" id="notes" required placeholder="Additional notes…"></textarea>
-
-      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
-
-      <button type="submit">Submit Record</button>
-    </form>
-    <div id="status"></div>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h1>Create Medical Record</h1>
+      <form id="recordForm">
+        <label for="patientID">Patient</label>
+        <select name="patientID" id="patientID" required>
+          <option value="" disabled selected>— select patient —</option>
+          <% patients.forEach(p => { %>
+            <option value="<%= p.uuid %>">
+              <%= p.name %> — <%= p.uuid %>
+            </option>
+          <% }) %>
+        </select>
+  
+        <label for="doctorID">Doctor</label>
+        <select name="doctorID" id="doctorID" required>
+          <option value="" disabled selected>— select doctor —</option>
+          <% doctors.forEach(d => { %>
+            <option value="<%= d.uuid %>">
+              <%= d.name %> — <%= d.uuid %>
+            </option>
+          <% }) %>
+        </select>
+  
+        <label for="symptoms">Symptoms</label>
+        <textarea name="symptoms" id="symptoms" placeholder="Describe symptoms…" required></textarea>
+  
+        <label for="diagnosis">Diagnosis</label>
+        <textarea name="diagnosis" id="diagnosis" placeholder="Enter diagnosis…" required></textarea>
+  
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" placeholder="Additional notes…" required></textarea>
+  
+        <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+  
+        <button type="submit">Submit Record</button>
+      </form>
+  
+      <div id="status"></div>
+    </div>  
   </div>
-
   <script>
     document.getElementById('recordForm').addEventListener('submit', async e => {
       e.preventDefault();
@@ -57,6 +125,7 @@
         notes:     f.notes.value,
         peers:     JSON.parse(f.peers.value)
       };
+      const statusEl = document.getElementById('status');
       try {
         const res = await fetch('/createMedicalRecord', {
           method: 'POST',
@@ -65,16 +134,14 @@
           body: JSON.stringify(body)
         });
         const json = await res.json();
-        const statusEl = document.getElementById('status');
         if (json.success) {
-          statusEl.className = '';
+          statusEl.className = 'success';
           statusEl.innerText = 'Record created successfully!';
         } else {
           statusEl.className = 'error';
-          statusEl.innerText = json.message || JSON.stringify(json);
+          statusEl.innerText = json.message || 'Submission failed';
         }
       } catch (err) {
-        const statusEl = document.getElementById('status');
         statusEl.className = 'error';
         statusEl.innerText = 'Error: ' + err.message;
       }

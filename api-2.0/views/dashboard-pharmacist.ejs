@@ -9,10 +9,17 @@
       padding: 0;
       background: #f4f7fa;
       font-family: Arial, sans-serif;
+      /* display: flex;
+      justify-content: center;
+      align-items: center; */
+      height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .dashboard {
       background: white;
@@ -51,13 +58,16 @@
   </style>
 </head>
 <body>
-  <div class="dashboard">
-    <h1>Welcome <%= username %> (Pharmacist)</h1>
-    <ul>
-      <li><a href="/getPrescriptions" class="button">Get Prescription</a></li>
-      <li><a href="/sendMessage"       class="button">Send Message</a></li>
-      <li><a href="/getMessages"      class="button">Get Messages</a></li>
-    </ul>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="dashboard">
+      <h1>Welcome <%= username %> (Pharmacist)</h1>
+      <ul>
+        <li><a href="/getPrescriptions" class="button">Get Prescription</a></li>
+        <li><a href="/sendMessage"       class="button">Send Message</a></li>
+        <li><a href="/getMessages"      class="button">Get Messages</a></li>
+      </ul>
+    </div>
   </div>
 </body>
 </html>

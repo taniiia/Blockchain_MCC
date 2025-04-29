@@ -10,10 +10,17 @@
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f0f4f8;
+      /* display: flex;
+      justify-content: center;
+      align-items: center; */
+      min-height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .card {
       background: #fff;
@@ -79,38 +86,40 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Patient Check-Out</h1>
-    <form id="checkoutForm">
-      <label for="patientID">Patient</label>
-      <select name="patientID" id="patientID" required>
-        <option value="" disabled selected>— select patient —</option>
-        <% patients.forEach(p => { %>
-          <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
-        <% }); %>
-      </select>
-
-      <label for="doctorID">Doctor</label>
-      <select name="doctorID" id="doctorID" required>
-        <option value="" disabled selected>— select doctor —</option>
-        <% doctors.forEach(d => { %>
-          <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
-        <% }); %>
-      </select>
-
-      <label for="patientInfo">Message</label>
-      <textarea name="patientInfo" id="patientInfo" placeholder="Type your message here…" required></textarea>
-
-      <label for="status">Status</label>
-      <input type="text" name="status" id="status" placeholder="e.g. Discharged" required />
-
-      <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
-
-      <button type="submit">Check Out</button>
-    </form>
-    <div id="message"></div>
-  </div>
-
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h1>Patient Check-Out</h1>
+      <form id="checkoutForm">
+        <label for="patientID">Patient</label>
+        <select name="patientID" id="patientID" required>
+          <option value="" disabled selected>— select patient —</option>
+          <% patients.forEach(p => { %>
+            <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
+          <% }); %>
+        </select>
+  
+        <label for="doctorID">Doctor</label>
+        <select name="doctorID" id="doctorID" required>
+          <option value="" disabled selected>— select doctor —</option>
+          <% doctors.forEach(d => { %>
+            <option value="<%= d.uuid %>"><%= d.name %> (<%= d.uuid %>)</option>
+          <% }); %>
+        </select>
+  
+        <label for="patientInfo">Message</label>
+        <textarea name="patientInfo" id="patientInfo" placeholder="Type your message here…" required></textarea>
+  
+        <label for="status">Status</label>
+        <input type="text" name="status" id="status" placeholder="e.g. Discharged" required />
+  
+        <input type="hidden" name="peers" value='<%= JSON.stringify(peers) %>' />
+  
+        <button type="submit">Check Out</button>
+      </form>
+      <div id="message"></div>
+    </div>
+  </div>  
   <script>
     document.getElementById('checkoutForm').addEventListener('submit', async e => {
       e.preventDefault();

@@ -417,67 +417,77 @@ app.get('/patientCheckIn', async (req, res) => {
 
 // Patient check-in (Registration channel). Expects: { patientID, doctorID, patientInfo, status, peers }
 // Patient check-in (Receptionist) + automatic sendMessage
+// Patient check-in (Receptionist) + automatic sendMessage
 app.post('/patientCheckIn', async (req, res) => {
   if (req.role !== 'receptionist') {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
   const { patientID, doctorID, patientInfo, status, peers } = req.body;
   if (!patientID || !doctorID || !patientInfo || !status) {
-    return res.status(400).json(getErrorMessage(
-      'patientID, doctorID, patientInfo, and status'
-    ));
+    return res.status(400).json({
+      success: false,
+      message: 'Must include patientID, doctorID, patientInfo and status'
+    });
   }
 
   try {
-    // 1) Do the check-in
-    const start = Date.now();
-    const checkinResult = await invoke.invokeTransaction(
+    // 1) Do the check-in on chain (pass patientInfo as plain text)
+    await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
       'patientCheckIn',
-      [ patientID, doctorID, JSON.stringify(patientInfo), status ],
+      [ patientID, doctorID, patientInfo, status ],
       req.username,
       req.orgName,
       peers
     );
 
-    // 2) Look up your own on-chain UUID (as sender)
-    const me = await query.getUserByUsername(
-      req.username,   // search for the receptionist
-      req.username,
+    // 2) Look up your own on-chain UUID as the sender
+    const me       = await query.getUserByUsername(
+      req.username,   // searchUsername
+      req.username,   // wallet identity
       req.orgName
     );
     const senderID = me.uuid;
 
-    // 3) Build and send the “assigned doctor” message
-    const message = `You’ve been assigned a doctor (${doctorID})`;
+    // 3) Send assignment notice to the patient
+    const doctorLogin = doctorID.split(':')[1] || doctorID;
+    const assignMsg   = `You’ve been assigned Dr. ${doctorLogin}`;
     await invoke.invokeTransaction(
       'patient-medication-channel',
       'mychaincode',
       'sendMessage',
-      [ senderID, patientID, message ],
+      [ senderID, patientID, assignMsg ],
       req.username,
       req.orgName,
       peers
     );
 
-    // 4) Return both results & latency
+    // 4) Forward the receptionist’s notes (patientInfo) to the doctor
+    await invoke.invokeTransaction(
+      'patient-medication-channel',
+      'mychaincode',
+      'sendMessage',
+      [ senderID, doctorID, patientInfo ],
+      req.username,
+      req.orgName,
+      peers
+    );
+
+    // 5) Return a friendly single success message
     return res.json({
-      success:        true,
-      checkinResult,
-      latency:        Date.now() - start
+      success: true,
+      message: 'Checked in and notifications sent.'
     });
 
-  } catch (error) {
-    console.error('POST /patientCheckIn error:', error);
+  } catch (err) {
+    console.error('POST /patientCheckIn error:', err);
     return res.status(500).json({
       success: false,
-      error:   error.name,
-      details: error.message
+      message: err.message
     });
   }
 });
-
 
 // ─── Render Check-Out form ───
 app.get('/checkOut', async (req, res) => {
@@ -1313,7 +1323,7 @@ app.get('/getMessages', async (req, res) => {
     );
     const recipientID = userRecord.uuid;
 
-    const messages = await query.evaluateTransaction(
+    const raw = await query.evaluateTransaction(
       'patient-medication-channel',
       'mychaincode',
       'getMessages',
@@ -1321,12 +1331,21 @@ app.get('/getMessages', async (req, res) => {
       req.username,
       req.orgName
     );
-
+    const messages = (raw || []).map(m => {
+      const parts = m.fromId.split(':');
+      return {
+        content: m.content,
+        senderRole: parts[0] || '',
+        senderUsername: parts[1] || parts[0] || m.fromId
+      };
+    });
+    
     res.render('getMessages', {
       username: req.username,
       orgName:  req.orgName,
       messages
     });
+
   } catch (err) {
     console.error('getMessages error:', err);
     res.status(500).send('Failed to fetch messages: ' + err.message);

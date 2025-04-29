@@ -10,10 +10,14 @@
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f0f4f8;
+      min-height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
+      height: calc(100vh - 60px);
+      margin-top: 60px;
     }
     .card {
       background: #fff;
@@ -64,62 +68,86 @@
       background: #357ab8;
       transform: translateY(-1px);
     }
-    #status {
+
+    /* feedback box */
+    #message {
       margin-top: 1em;
-      color: green;
       text-align: center;
+      font-weight: 500;
+      color: green;
     }
-    #status.error {
+    #message.error {
       color: red;
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Create Prescription</h1>
-    <form id="prescForm">
-      <!-- hidden fields -->
-      <input type="hidden" name="doctorID" value="<%= doctorID %>" />
-      <input type="hidden" name="peers"     value='<%= JSON.stringify(peers) %>' />
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h1>Create Prescription</h1>
+      <form id="prescForm">
+        <!-- hidden fields -->
+        <input type="hidden" name="doctorID" value="<%= doctorID %>" />
+        <input type="hidden" name="peers"     value='<%= JSON.stringify(peers) %>' />
 
-      <label for="patientID">Patient</label>
-      <select name="patientID" id="patientID" required>
-        <option value="" disabled selected>— select patient —</option>
-        <% patients.forEach(p => { %>
-          <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
-        <% }) %>
-      </select>
+        <label for="patientID">Patient</label>
+        <select name="patientID" id="patientID" required>
+          <option value="" disabled selected>— select patient —</option>
+          <% patients.forEach(p => { %>
+            <option value="<%= p.uuid %>"><%= p.name %> (<%= p.uuid %>)</option>
+          <% }) %>
+        </select>
 
-      <label for="pharmacistID">Pharmacist</label>
-      <select name="pharmacistID" id="pharmacistID" required>
-        <option value="" disabled selected>— select pharmacist —</option>
-        <% pharmacists.forEach(ph => { %>
-          <option value="<%= ph.uuid %>"><%= ph.name %> (<%= ph.uuid %>)</option>
-        <% }) %>
-      </select>
+        <label for="pharmacistID">Pharmacist</label>
+        <select name="pharmacistID" id="pharmacistID" required>
+          <option value="" disabled selected>— select pharmacist —</option>
+          <% pharmacists.forEach(ph => { %>
+            <option value="<%= ph.uuid %>"><%= ph.name %> (<%= ph.uuid %>)</option>
+          <% }) %>
+        </select>
 
-      <label for="medications">Medications</label>
-      <input type="text" name="medications" id="medications"
-             placeholder="e.g. Aspirin, Ibuprofen" required />
+        <label for="medications">Medications</label>
+        <input
+          type="text"
+          name="medications"
+          id="medications"
+          placeholder="e.g. Aspirin, Ibuprofen"
+          required
+        />
 
-      <label for="billAmount">Bill Amount</label>
-      <input type="number" name="billAmount" id="billAmount" step="0.01"
-             placeholder="e.g. 120.50" required />
+        <label for="billAmount">Bill Amount</label>
+        <input
+          type="number"
+          name="billAmount"
+          id="billAmount"
+          step="0.01"
+          placeholder="e.g. 120.50"
+          required
+        />
 
-      <label for="status">Status</label>
-      <input type="text" name="status" id="status"
-             placeholder="e.g. Pending" required />
+        <label for="status">Status</label>
+        <input
+          type="text"
+          name="status"
+          id="status"
+          placeholder="e.g. Pending"
+          required
+        />
 
-      <button type="submit">Submit</button>
-    </form>
-    <div id="status"></div>
+        <button type="submit">Submit</button>
+      </form>
+
+      <!-- feedback goes here -->
+      <div id="message"></div>
+    </div>
   </div>
 
   <script>
     document.getElementById('prescForm').addEventListener('submit', async e => {
       e.preventDefault();
       const f = e.target;
-      const statusEl = document.getElementById('status');
+      const msgEl = document.getElementById('message');
       const body = {
         patientID:    f.patientID.value,
         pharmacistID: f.pharmacistID.value,
@@ -130,7 +158,7 @@
         peers:        JSON.parse(f.peers.value)
       };
       try {
-        const res = await fetch('/createPrescription', {
+        const res  = await fetch('/createPrescription', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -138,14 +166,14 @@
         });
         const json = await res.json();
         if (json.success) {
-          statusEl.className = '';
-          statusEl.innerText = 'Prescription created successfully!';
+          msgEl.className = '';
+          msgEl.innerText = 'Prescription created successfully!';
         } else {
-          throw new Error(json.message || JSON.stringify(json));
+          throw new Error(json.message || 'Submission failed');
         }
       } catch (err) {
-        statusEl.className = 'error';
-        statusEl.innerText = 'Error: ' + err.message;
+        msgEl.className = 'error';
+        msgEl.innerText = 'Error: ' + err.message;
       }
     });
   </script>

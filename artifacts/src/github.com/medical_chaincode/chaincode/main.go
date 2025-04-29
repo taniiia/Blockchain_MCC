@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"encoding/base64"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -663,24 +665,50 @@ func (s *SmartContract) createMedicalRecord(APIstub shim.ChaincodeStubInterface,
 }
 
 func (s *SmartContract) getMedicalRecord(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-	// Expects: [recordID, receiverID, mccAuthToken]
+	// Expects exactly 3 args: [recordID, receiverID, mccAuthTokenJSON]
 	if len(args) != 3 {
 		return shim.Error("Incorrect number of arguments. Expecting 3")
 	}
 
+	// 1) Confirm caller has the 'patient' role
 	clientID, err := cid.New(APIstub)
 	if err != nil {
 		return shim.Error("Failed to get client identity: " + err.Error())
 	}
-
 	role, found, err := clientID.GetAttributeValue("role")
 	if err != nil {
 		return shim.Error("Error reading attribute 'role': " + err.Error())
 	}
-	if !found || (role != "patient") {
+	if !found || role != "patient" {
 		return shim.Error("Unauthorized: Only users with 'patient' role can retrieve medical records")
 	}
 
+	// 2) Parse and verify the mccAuthToken payload
+	var auth struct {
+		PublicKey string `json:"publicKey"` // base64‐encoded Ed25519 public key
+		Signature string `json:"signature"` // base64‐encoded Ed25519 signature
+	}
+	if err := json.Unmarshal([]byte(args[2]), &auth); err != nil {
+		return shim.Error("Failed to parse auth token JSON: " + err.Error())
+	}
+
+	// 3) Decode the public key and signature from base64
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(auth.PublicKey)
+	if err != nil {
+		return shim.Error("Invalid base64 in publicKey: " + err.Error())
+	}
+	sigBytes, err := base64.StdEncoding.DecodeString(auth.Signature)
+	if err != nil {
+		return shim.Error("Invalid base64 in signature: " + err.Error())
+	}
+
+	// 4) Reconstruct the challenge string and verify the signature
+	challenge := []byte("access_medical_record:" + args[0])
+	if !ed25519.Verify(pubKeyBytes, challenge, sigBytes) {
+		return shim.Error("Unauthorized: invalid signature on auth token")
+	}
+
+	// 5) Fetch the private data
 	recJSON, err := APIstub.GetPrivateData("PrivateMedicalRecords", args[0])
 	if err != nil {
 		return shim.Error("Failed to read medical record: " + err.Error())
@@ -689,6 +717,10 @@ func (s *SmartContract) getMedicalRecord(APIstub shim.ChaincodeStubInterface, ar
 		return shim.Error("Medical record not found")
 	}
 
+	// 6) Optionally, you could also check that args[1] (receiverID) matches the invoker’s identity:
+	//    if receiverIDFromCert != args[1] { ... }
+
+	// 7) Success: return the wrapped record JSON
 	return shim.Success(recJSON)
 }
 
@@ -780,18 +812,35 @@ func (s *SmartContract) getPrescription(APIstub shim.ChaincodeStubInterface, arg
 		return shim.Error("Unauthorized: Only pharmacists may retrieve prescriptions")
 	}
 
-	// 2) Ensure caller's CN matches the pharmacistID passed in
-	// cert, err := cid.GetX509Certificate(APIstub)
-	// if err != nil {
-	// 	return shim.Error("Failed to get client certificate: " + err.Error())
-	// }
-	// parts := strings.Split(args[1], ":")
-	// if len(parts) < 2 || cert.Subject.CommonName != parts[1] {
-	// 	return shim.Error("Unauthorized: pharmacist mismatch")
-	// }
+	// 2) Parse and verify the MCC auth token
+	var auth struct {
+		PublicKey string `json:"publicKey"` // base64‐encoded Ed25519 public key
+		Signature string `json:"signature"` // base64‐encoded Ed25519 signature
+	}
+	if err := json.Unmarshal([]byte(args[2]), &auth); err != nil {
+		return shim.Error("Failed to parse auth token JSON: " + err.Error())
+	}
 
-	// 3) (optional) you could parse args[2] here and verify the MCC signature
-	//    but since you already did that off‐chain, we'll skip it
+	// Decode base64
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(auth.PublicKey)
+	if err != nil {
+		return shim.Error("Invalid base64 in publicKey: " + err.Error())
+	}
+	sigBytes, err := base64.StdEncoding.DecodeString(auth.Signature)
+	if err != nil {
+		return shim.Error("Invalid base64 in signature: " + err.Error())
+	}
+
+	// Recreate the challenge and verify signature
+	challenge := []byte("access_prescription:" + args[0])
+	if !ed25519.Verify(pubKeyBytes, challenge, sigBytes) {
+		return shim.Error("Unauthorized: invalid signature on auth token")
+	}
+
+	// 3) (Optional) Ensure the pharmacistID in args[1] matches the invoker’s CN
+	//    cert, err := cid.GetX509Certificate(APIstub)
+	//    if err != nil { ... }
+	//    if cert.Subject.CommonName != extractCommonName(args[1]) { ... }
 
 	// 4) Fetch the encrypted prescription from the private collection
 	recBytes, err := APIstub.GetPrivateData("PrivatePrescriptions", args[0])

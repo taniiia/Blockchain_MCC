@@ -10,10 +10,17 @@
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f0f4f8;
+      /* display: flex;
+      justify-content: center;
+      align-items: center; */
+      min-height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .dashboard {
       background: white;
@@ -55,14 +62,17 @@
   </style>
 </head>
 <body>
-  <div class="dashboard">
-    <h1>Welcome, <%= username %></h1>
-    <ul class="actions">
-      <li><a href="/createMedicalRecord">Create Medical Record</a></li>
-      <li><a href="/createPrescription">Create Prescription</a></li>
-      <li><a href="/sendMessage">Send Message</a></li>
-      <li><a href="/getMessages">Get Messages</a></li>
-    </ul>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="dashboard">
+      <h1>Welcome, <%= username %></h1>
+      <ul class="actions">
+        <li><a href="/createMedicalRecord">Create Medical Record</a></li>
+        <li><a href="/createPrescription">Create Prescription</a></li>
+        <li><a href="/sendMessage">Send Message</a></li>
+        <li><a href="/getMessages">Get Messages</a></li>
+      </ul>
+    </div>
   </div>
 </body>
 </html>

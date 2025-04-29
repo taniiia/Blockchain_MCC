@@ -10,18 +10,23 @@
       padding: 0;
       background: #f0f4f8;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
+      align-items: center;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .container {
       background: white;
-      margin: 2rem;
+      margin: 1rem auto;
       padding: 2rem;
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      width: 360px;
+      /* nearly full width, with 2rem gutters at each side */
+      width: calc(100% - 4rem);
+      max-width: none;
       text-align: center;
     }
     h1 {
@@ -33,17 +38,26 @@
       list-style: none;
       padding: 0;
       margin: 0;
+      text-align: left;
     }
     .message-card {
       background: #eaf3fc;
       border-radius: 6px;
       padding: 1rem;
       margin-bottom: 1rem;
-      text-align: left;
+      word-break: break-word;
+      white-space: pre-wrap;
       transition: transform 0.1s;
     }
     .message-card:hover {
       transform: translateY(-2px);
+    }
+    .message-card p {
+      margin: 0; /* <-- add this */
+      padding: 0;
+    }
+    .message-card p + p {
+      margin-top: 0.3rem; /* <-- small space between From and Message */
     }
     .message-card strong {
       color: #4a90e2;
@@ -70,24 +84,27 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Messages for <%= username %></h1>
-
-    <% if (!messages.length) { %>
-      <p class="empty">No messages found.</p>
-    <% } else { %>
-      <ul class="message-list">
-        <% messages.forEach(m => { %>
-          <li class="message-card">
-            <p><strong>From:</strong> <%= m.fromId %></p>
-            <p><strong>Message:</strong> <%= m.content %></p>
-          </li>
-        <% }) %>
-      </ul>
-    <% } %>
-
-    <div class="actions">
-      <a href="/sendMessage">Send a New Message</a>
+  <%- include('partials/header') %>
+  <di class="card-wrapper">
+    <div class="container">
+      <h1>Messages for <%= username %></h1>
+  
+      <% if (!messages.length) { %>
+        <p class="empty">No messages found.</p>
+      <% } else { %>
+        <ul class="message-list">
+          <% messages.forEach(m => { %>
+            <li class="message-card">
+              <p><strong>From:</strong> <%= m.senderUsername %></p>
+              <p><strong>Message:</strong> <%= m.content %></p>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+  
+      <div class="actions">
+        <a href="/sendMessage">Send a New Message</a>
+      </div>
     </div>
   </div>
 </body>

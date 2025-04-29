@@ -15,9 +15,19 @@
       align-items: flex-start;
       min-height: 100vh;
     }
+    /* flex‐wrapper to center the inner .container */
+    .card-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: calc(100vh - 60px); /* account for header */
+      margin-top: 60px;
+    }
     .container {
       background: white;
-      margin: 2rem;
+      /* remove margin so it truly centers */
+      margin: 0;
       padding: 2rem;
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -91,44 +101,47 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Prescriptions for <%= username %></h1>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="container">
+      <h1>Prescriptions for <%= username %></h1>
 
-    <% if (loadError) { %>
-      <p class="error"><%= loadError %></p>
-    <% } %>
+      <% if (loadError) { %>
+        <p class="error"><%= loadError %></p>
+      <% } %>
 
-    <form method="POST" action="/getPrescriptions">
-      <label for="prescID">Select Prescription</label>
-      <select name="prescID" id="prescID" required>
-        <% if (prescriptions.length) { %>
-          <% prescriptions.forEach(id => { %>
-            <option value="<%= id %>" <%= selected===id?'selected':'' %>>
-              <%= id %>
-            </option>
-          <% }) %>
-        <% } else { %>
-          <option disabled>No prescriptions available</option>
-        <% } %>
-      </select>
-      <input type="hidden" name="pharmacistID" value="<%= pharmacistID %>">
-      <button type="submit">Fetch</button>
-    </form>
+      <form method="POST" action="/getPrescriptions">
+        <label for="prescID">Select Prescription</label>
+        <select name="prescID" id="prescID" required>
+          <% if (prescriptions.length) { %>
+            <% prescriptions.forEach(id => { %>
+              <option value="<%= id %>" <%= selected===id?'selected':'' %>>
+                <%= id %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option disabled>No prescriptions available</option>
+          <% } %>
+        </select>
+        <input type="hidden" name="pharmacistID" value="<%= pharmacistID %>">
+        <button type="submit">Fetch</button>
+      </form>
 
-    <% if (error) { %>
-      <p class="error"><%= error %></p>
-    <% } %>
+      <% if (error) { %>
+        <p class="error"><%= error %></p>
+      <% } %>
 
-    <% if (prescription) { %>
-      <div class="card">
-        <h2>Prescription Details</h2>
-        <ul>
-          <li><strong>Medications:</strong>   <%= prescription.medications.join(', ') %></li>
-          <li><strong>Bill Amount:</strong>   ₹<%= prescription.billAmount     %></li>
-          <li><strong>Status:</strong>        <%= prescription.status          %></li>
-        </ul>
-      </div>
-    <% } %>
+      <% if (prescription) { %>
+        <div class="card">
+          <h2>Prescription Details</h2>
+          <ul>
+            <li><strong>Medications:</strong>   <%= prescription.medications.join(', ') %></li>
+            <li><strong>Bill Amount:</strong>   ₹<%= prescription.billAmount     %></li>
+            <li><strong>Status:</strong>        <%= prescription.status          %></li>
+          </ul>
+        </div>
+      <% } %>
+    </div>
   </div>
 </body>
 </html>

@@ -13,6 +13,13 @@
       height: 100vh;
       margin: 0;
     }
+    .card-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
+    }
     .card {
       background: white;
       padding: 2rem;
@@ -56,35 +63,37 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Send Message</h1>
-
-    <form id="msgForm">
-      <label for="recipientID">Recipient</label>
-      <select name="recipientID" id="recipientID" required>
-        <option value="" disabled selected>— choose user —</option>
-        <% users
-             .filter(u => u.organization === orgName)
-             .forEach(u => { %>
-          <option value="<%= u.uuid %>">
-            <%= u.name %> (<%= u.role %>)
-          </option>
-        <% }) %>
-      </select>
-
-      <label for="message">Message</label>
-      <textarea name="message" id="message" rows="4" placeholder="Type your message…" required></textarea>
-
-      <!-- pass peers from GET -->
-      <input type="hidden" name="peers" id="peers" value='<%= JSON.stringify(peers) %>' />
-
-      <button type="submit">Send</button>
-    </form>
-
-    <div id="feedback"></div>
-    <!-- <a href="/" class="back">← Back to Dashboard</a> -->
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h1>Send Message</h1>
+  
+      <form id="msgForm">
+        <label for="recipientID">Recipient</label>
+        <select name="recipientID" id="recipientID" required>
+          <option value="" disabled selected>— choose user —</option>
+          <% users
+               .filter(u => u.organization === orgName)
+               .forEach(u => { %>
+            <option value="<%= u.uuid %>">
+              <%= u.name %> (<%= u.role %>)
+            </option>
+          <% }) %>
+        </select>
+  
+        <label for="message">Message</label>
+        <textarea name="message" id="message" rows="4" placeholder="Type your message…" required></textarea>
+  
+        <!-- pass peers from GET -->
+        <input type="hidden" name="peers" id="peers" value='<%= JSON.stringify(peers) %>' />
+  
+        <button type="submit">Send</button>
+      </form>
+  
+      <div id="feedback"></div>
+      <!-- <a href="/" class="back">← Back to Dashboard</a> -->
+    </div>  
   </div>
-
   <script>
     const form = document.getElementById('msgForm');
     const fb   = document.getElementById('feedback');

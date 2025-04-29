@@ -10,10 +10,17 @@
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f0f4f8;
+      /* display: flex;
+      justify-content: center;
+      align-items: center; */
+      min-height: 100vh;
+    }
+    .card-wrapper {
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .card {
       background: #fff;
@@ -81,24 +88,27 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Login</h1>
-    <form action="/users/login" method="POST">
-      <label for="username">Username</label>
-      <input type="text" id="username" name="username" required />
-
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" required />
-
-      <label for="orgName">Organization</label>
-      <select id="orgName" name="orgName" required>
-        <option value="PESUHospitalBLR">PESUHospitalBLR</option>
-        <option value="PESUHospitalKPM">PESUHospitalKPM</option>
-      </select>
-
-      <button type="submit">Login</button>
-    </form>
-    <p>Don't have an account? <a href="/register">Register here</a></p>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h1>Login</h1>
+      <form action="/users/login" method="POST">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+  
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+  
+        <label for="orgName">Organization</label>
+        <select id="orgName" name="orgName" required>
+          <option value="PESUHospitalBLR">PESUHospitalBLR</option>
+          <option value="PESUHospitalKPM">PESUHospitalKPM</option>
+        </select>
+  
+        <button type="submit">Login</button>
+      </form>
+      <p>Don't have an account? <a href="/register">Register here</a></p>
+    </div>
   </div>
 </body>
 </html>

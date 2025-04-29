@@ -9,8 +9,15 @@
       margin: 0; padding: 0;
       background: #f0f4f8;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex; justify-content: center; align-items: center;
+      /* display: flex; justify-content: center; align-items: center; */
       min-height: 100vh;
+    }
+    .card-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: calc(100vh - 60px); /* subtract header height */
+      margin-top: 60px; /* offset content so it’s not behind header */
     }
     .card {
       background: #fff;
@@ -67,44 +74,47 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Doctor Registration</h2>
-
-    <% if (error) { %>
-      <p class="error"><%= error %></p>
-    <% } %>
-
-    <form action="/registerDoctor" method="post">
-      <label for="username">Username</label>
-      <input type="text" id="username" name="username" required />
-
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" required />
-
-      <label for="specialisation">Specialisation</label>
-      <input type="text" id="specialisation" name="specialisation" required />
-
-      <label for="orgName">Organization</label>
-      <select id="orgName" name="orgName" required>
-        <option value="" disabled selected>— Select Organization —</option>
-        <option value="PESUHospitalBLR">PESUHospitalBLR</option>
-        <option value="PESUHospitalKPM">PESUHospitalKPM</option>
-      </select>
-
-      <label for="gender">Gender</label>
-      <select id="gender" name="gender" required>
-        <option value="" disabled selected>— Select Gender —</option>
-        <option value="male">Male</option>
-        <option value="female">Female</option>
-        <option value="other">Other</option>
-      </select>
-
-      <button type="submit">Register Doctor</button>
-    </form>
-
-    <p class="login-link">
-      Already have an account? <a href="/login">Login here</a>
-    </p>
+  <%- include('partials/header') %>
+  <div class="card-wrapper">
+    <div class="card">
+      <h2>Doctor Registration</h2>
+  
+      <% if (error) { %>
+        <p class="error"><%= error %></p>
+      <% } %>
+  
+      <form action="/registerDoctor" method="post">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+  
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+  
+        <label for="specialisation">Specialisation</label>
+        <input type="text" id="specialisation" name="specialisation" required />
+  
+        <label for="orgName">Organization</label>
+        <select id="orgName" name="orgName" required>
+          <option value="" disabled selected>— Select Organization —</option>
+          <option value="PESUHospitalBLR">PESUHospitalBLR</option>
+          <option value="PESUHospitalKPM">PESUHospitalKPM</option>
+        </select>
+  
+        <label for="gender">Gender</label>
+        <select id="gender" name="gender" required>
+          <option value="" disabled selected>— Select Gender —</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Other</option>
+        </select>
+  
+        <button type="submit">Register Doctor</button>
+      </form>
+  
+      <p class="login-link">
+        Already have an account? <a href="/login">Login here</a>
+      </p>
+    </div>
   </div>
 </body>
 </html>

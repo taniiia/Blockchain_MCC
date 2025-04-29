@@ -54,7 +54,7 @@ presetup() {
 
 CHANNEL_NAME="patient-medication-channel"
 CC_RUNTIME_LANGUAGE="golang"
-VERSION="19"
+VERSION="20"
 CC_SRC_PATH="./artifacts/src/github.com/medical_chaincode/chaincode"
 CC_NAME="mychaincode"
 
@@ -319,7 +319,7 @@ chaincodeInvoke() {
 #   -c '{"function": "SmartContract:createMedicalRecord", "Args": ["patient1", "Flu", "Rest and hydration"]}'
 }
 
-##chaincodeInvoke
+#chaincodeInvoke
 
 # chaincodeQuery() {
 #     setGlobalsForPeer0Org2
